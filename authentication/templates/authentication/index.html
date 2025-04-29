@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome</title>
+</head>
+<body>
+    {% if user.is_authenticated %}
+        <h1>Welcome, {{ user.get_full_name }}!</h1>
+        <p>Let's make the company neteotk more secure</p>
+        
+        <!-- Logout Form (uses POST request) -->
+        <form action="{% url 'logout' %}" method="post">
+            {% csrf_token %}
+            <a href="{% url 'role_form' %}">Enter the Network</a>
+
+            <button type="submit">Logout</button>
+        </form>
+    {% else %}
+        <h1>Welcome</h1>
+        <a href="{% url 'social:begin' 'google-oauth2' %}?next=/">Login with Google</a>
+    {% endif %}
+</body>
+</html>
