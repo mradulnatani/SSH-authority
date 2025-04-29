@@ -1,0 +1,15 @@
+<form method="post">
+    {% csrf_token %}
+    <label for="role">Select your role:</label>
+    <select name="role" id="role" required>
+      <option value="admin">Admin</option>
+      <option value="developer">Developer</option>
+      <option value="intern">Intern</option>
+    </select>
+    <br><br>
+    <label for="ssh_key">Enter your SSH Public Key:</label><br>
+    <textarea name="ssh_key" rows="5" cols="60" required></textarea>
+    <br><br>
+    <button type="submit">Submit</button>
+  </form>
+  
