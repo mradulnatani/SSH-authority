@@ -1,0 +1,53 @@
+{% extends "authentication/base.html" %}
+
+{% block title %}Activity Log - TechRizzy{% endblock %}
+
+{% block content %}
+<div class="activity-container">
+    <div class="certificate-info">
+        <h2><i class="fas fa-certificate"></i> Certificate Details</h2>
+        <div class="cert-info-grid">
+            <div class="cert-info-item">
+                <span class="label">Status</span>
+                <span class="value active">Active</span>
+            </div>
+            <div class="cert-info-item">
+                <span class="label">Issued</span>
+                <span class="value">{{ cert_issued }}</span>
+            </div>
+            <div class="cert-info-item">
+                <span class="label">Expires</span>
+                <span class="value">{{ cert_validity }}</span>
+            </div>
+            <div class="cert-info-item">
+                <span class="label">Role</span>
+                <span class="value">{{ request.session.selected_role }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="activity-log-section">
+        <h3><i class="fas fa-history"></i> Recent Activity</h3>
+        
+        <div class="activity-timeline">
+            {% for entry in recent_actions %}
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <span class="time">{{ entry.time }}</span>
+                        <span class="action-type {{ entry.action|lower }}">{{ entry.action_type }}</span>
+                    </div>
+                    <p class="action-details">{{ entry.action }}</p>
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <i class="fas fa-info-circle"></i>
+                <p>No recent activity found</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

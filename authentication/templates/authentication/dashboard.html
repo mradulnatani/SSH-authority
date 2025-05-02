@@ -1,0 +1,43 @@
+{% extends 'authentication/base.html' %}
+
+{% block title %}Dashboard - TechRizzy{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>Welcome, {{ user.email }}</h2>
+        <div class="current-role">
+            <span class="role-badge">{{ request.session.selected_role|default:"No role selected" }}</span>
+        </div>
+    </div>
+    
+    <div class="dashboard-grid">
+        <div class="dashboard-card">
+            <div class="card-icon blue">
+                <i class="fas fa-key"></i>
+            </div>
+            <h3>Upload SSH Key</h3>
+            <p>Upload your SSH public key to access servers with your current role</p>
+            <a href="{% url 'upload_key' %}" class="btn primary">Upload Key</a>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-icon green">
+                <i class="fas fa-certificate"></i>
+            </div>
+            <h3>Certificate Information</h3>
+            <p>View your active certificate status and authentication events</p>
+            <a href="{% url 'activity_log' %}" class="btn primary">View Details</a>
+        </div>
+        
+        <div class="dashboard-card">
+            <div class="card-icon red">
+                <i class="fas fa-server"></i>
+            </div>
+            <h3>SSH Access</h3>
+            <p>Get connection details for servers permitted for your current role</p>
+            <a href="{% url 'ssh_access' %}" class="btn primary">Access Details</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

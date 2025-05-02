@@ -1,15 +1,32 @@
-<form method="post">
-    {% csrf_token %}
-    <label for="role">Select your role:</label>
-    <select name="role" id="role" required>
-      <option value="admin">Admin</option>
-      <option value="developer">Developer</option>
-      <option value="intern">Intern</option>
-    </select>
-    <br><br>
-    <label for="ssh_key">Enter your SSH Public Key:</label><br>
-    <textarea name="ssh_key" rows="5" cols="60" required></textarea>
-    <br><br>
-    <button type="submit">Submit</button>
-  </form>
-  
+{% extends 'authentication/base.html' %}
+
+{% block title %}Select Role - TechRizzy{% endblock %}
+
+{% block content %}
+<div class="role-selection-container">
+    <div class="role-selection-box">
+        <h2><i class="fas fa-user-tag"></i> Select Your Role</h2>
+        <p>Choose the role you want to use for this session:</p>
+        
+        <form method="post" class="role-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="role">Available Roles:</label>
+                <select id="role" name="role" class="form-control" required>
+                    <option value="">-- Select Role --</option>
+                    {% for role in group_roles %}
+                    <option value="{{ role }}">{{ role }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn primary">
+                    <i class="fas fa-check-circle"></i> Continue
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
