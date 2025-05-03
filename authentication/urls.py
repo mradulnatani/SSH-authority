@@ -1,11 +1,11 @@
-from django.urls import path,include
-
+from django.urls import path
 from . import views
 
-urlpatterns =[
-    path("",views.index, name="index"),
-    path("home/", views.home, name="home"),
-    path("role-form/", views.role_form, name="role_form"),
-
-
+urlpatterns = [
+    path('', views.index, name='index'),  # This is your login page , my dumbass added base.html as login
+    path('dashboard/', views.dashboard, name='dashboard'),
+    path('role-form/', views.role_form, name='role_form'),  # Add the role form route , pehle kuch aur likha tha isilye didnt work
+    path('upload-key/', views.upload_key, name='upload_key'),
+    path('activity-log/', views.activity_log, name='activity_log'),
+    path('ssh-access/', views.ssh_access, name='ssh_access'),
 ]

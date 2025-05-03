@@ -1,0 +1,41 @@
+{% extends "authentication/base.html" %}
+
+{% block title %}SSH Access - TechRizzy{% endblock %}
+
+{% block content %}
+<div class="ssh-access-container">
+    <div class="section-header">
+        <h2><i class="fas fa-server"></i> Servers You Can Access</h2>
+        <p>These servers are available for your current role "{{ request.session.selected_role }}"</p>
+    </div>
+    
+    <div class="server-list">
+        <div class="server-list-header">
+            <span>Server IP</span>
+            <span>Status</span>
+        </div>
+        
+        {% for ip in ips %}
+        <div class="server-item">
+            <span class="ip-address">{{ ip }}</span>
+            <span class="status-badge active">Active</span>
+        </div>
+        {% empty %}
+        <div class="empty-state">
+            <i class="fas fa-info-circle"></i>
+            <p>No servers available for your current role</p>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="connection-help">
+        <h3><i class="fas fa-question-circle"></i> Connection Instructions</h3>
+        <div class="code-block">
+            <code>ssh -i ~/.ssh/your_private_key user@server_ip</code>
+            <button class="copy-btn" onclick="copyToClipboard(this)">
+                <i class="far fa-copy"></i>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

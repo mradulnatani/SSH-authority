@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TechRizzy Certificate Authority{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'authentication/styles.css' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <h1>TechRizzy</h1>
+            </div>
+            {% if user.is_authenticated %}
+            <nav>
+                <ul>
+                    <li><a href="{% url 'dashboard' %}"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="{% url 'upload_key' %}"><i class="fas fa-key"></i> SSH Key</a></li>
+                    <li><a href="{% url 'activity_log' %}"><i class="fas fa-history"></i> Activity</a></li>
+                    <li><a href="{% url 'ssh_access' %}"><i class="fas fa-server"></i> Servers</a></li>
+                    <li><a href="{% url 'logout' %}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}
+        <!-- Content will be inserted here by extending templates -->
+        {% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 TechRizzy Certificate Authority</p>
+        </div>
+    </footer>
+</body>
+</html>
