@@ -3,6 +3,139 @@
 {% block title %}SSH Access - TechRizzy{% endblock %}
 
 {% block content %}
+<style>
+    .ssh-access-container {
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .section-header {
+        margin-bottom: 25px;
+    }
+
+    .section-header h2 {
+        font-size: 24px;
+        font-weight: 600;
+        color: #1f2937;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-header p {
+        color: #6b7280;
+        margin-top: 8px;
+    }
+
+    .server-list {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 30px;
+    }
+
+    .server-list-header {
+        background-color: #f9fafb;
+        font-weight: 600;
+        color: #374151;
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .server-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-top: 1px solid #f3f4f6;
+        align-items: center;
+    }
+
+    .ip-address {
+        font-family: monospace;
+        color: #111827;
+    }
+
+    .status-badge {
+        padding: 4px 10px;
+        font-size: 13px;
+        border-radius: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+
+    .status-badge.active {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 20px;
+        color: #6b7280;
+    }
+
+    .empty-state i {
+        font-size: 20px;
+        margin-bottom: 10px;
+        display: block;
+    }
+
+    .connection-help {
+        background-color: #f9fafb;
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
+
+    .connection-help h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .code-block {
+        position: relative;
+        background-color: #111827;
+        color: #f9fafb;
+        font-family: monospace;
+        padding: 14px;
+        border-radius: 6px;
+    }
+
+    .copy-btn {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        background: transparent;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+    .copy-btn:hover {
+        color: #facc15;
+    }
+</style>
+<script>
+    function copyToClipboard(btn) {
+        const code = btn.parentElement.querySelector("code").innerText;
+        navigator.clipboard.writeText(code).then(() => {
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="far fa-copy"></i>';
+            }, 1500);
+        });
+    }
+    </script>
+    
 <div class="ssh-access-container">
     <div class="section-header">
         <h2><i class="fas fa-server"></i> Servers You Can Access</h2>

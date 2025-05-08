@@ -3,6 +3,137 @@
 {% block title %}Activity Log - TechRizzy{% endblock %}
 
 {% block content %}
+    <style>
+    .activity-container {
+        max-width: 1000px;
+        margin: 40px auto;
+        padding: 0 20px;
+        font-family: 'Segoe UI', sans-serif;
+        color: #333;
+    }
+
+    .certificate-info {
+        background: #fff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+        margin-bottom: 30px;
+    }
+
+    .certificate-info h2 {
+        font-size: 22px;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .cert-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    .cert-info-item .label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #555;
+    }
+
+    .cert-info-item .value {
+        font-size: 15px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background-color: #f1f3f5;
+        display: inline-block;
+    }
+
+    .value.active {
+        background-color: #d4edda;
+        color: #155724;
+        font-weight: 600;
+    }
+
+    .activity-log-section h3 {
+        font-size: 20px;
+        margin-bottom: 20px;
+        color: #34495e;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .activity-timeline {
+        position: relative;
+        margin-left: 10px;
+        padding-left: 20px;
+        border-left: 2px solid #ccc;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 25px;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -10px;
+        top: 5px;
+        width: 12px;
+        height: 12px;
+        background-color: #3498db;
+        border-radius: 50%;
+    }
+
+    .timeline-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+    }
+
+    .time {
+        font-size: 13px;
+        color: #999;
+    }
+
+    .action-type {
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        color: #fff;
+        background-color: #777;
+        text-transform: capitalize;
+    }
+
+    .action-type.added {
+        background-color: #28a745;
+    }
+
+    .action-type.issued {
+        background-color: #007bff;
+    }
+
+    .action-details {
+        margin: 0;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .empty-state {
+        text-align: center;
+        color: #888;
+        font-size: 14px;
+        margin-top: 20px;
+    }
+
+    .empty-state i {
+        font-size: 20px;
+        margin-bottom: 5px;
+    }
+</style>
+
 <div class="activity-container">
     <div class="certificate-info">
         <h2><i class="fas fa-certificate"></i> Certificate Details</h2>

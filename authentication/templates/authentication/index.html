@@ -1,13 +1,90 @@
-{% extends 'authentication/base.html' %}
+<style>
+    /* General reset and font */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f6f9;
+    color: #333;
+}
 
+/* Centering container */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* Box styling */
+.login-box {
+    background-color: #fff;
+    padding: 40px 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    width: 100%;
+    max-width: 420px;
+}
+
+/* Logo */
+.login-logo {
+    width: 80px;
+    height: auto;
+    margin-bottom: 20px;
+}
+
+/* Headings */
+.login-box h2 {
+    margin-bottom: 10px;
+    font-size: 24px;
+    color: #2c3e50;
+}
+
+.login-box p {
+    font-size: 15px;
+    margin-bottom: 30px;
+    color: #555;
+}
+
+/* Google sign-in button */
+.google-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgb(11, 11, 151);
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 16px;
+    text-decoration: none;
+    color: white;
+    transition: background-color 0.3s ease;
+    width: 100%;
+    max-width: 280px;
+    margin: auto;
+}
+
+.google-btn img {
+    width: 20px;
+    margin-right: 10px;
+}
+
+.google-btn:hover {
+    background-color: #6792e2;
+    border-color: #aaa;
+    color: black;
+    cursor: pointer;
+}
+</style>
 {% block title %}TechRizzy - Login{% endblock %}
 
 {% block content %}
 <div class="login-container">
     <div class="login-box">
         <img src="" alt="TechRizzy Logo" class="login-logo">
-        <h2>Certificate Authority Login</h2>
-        <p>Please sign in with your Google account to access the certificate management system.</p>
+        <h2><b>TechRizzy SSH Certificate Portal</b></h2>
+        <p>Sign in with your company account</p>
         
         <div class="login-buttons">
             <a href="{% url 'social:begin' 'google-oauth2' %}" class="google-btn">
