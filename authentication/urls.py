@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
     path('', views.index, name='index'),  # This is your login page , my dumbass added base.html as login
@@ -8,4 +9,5 @@ urlpatterns = [
     path('upload-key/', views.upload_key, name='upload_key'),
     path('activity-log/', views.activity_log, name='activity_log'),
     path('ssh-access/', views.ssh_access, name='ssh_access'),
+    path('logout/', views.logout_view, name='logout')
 ]

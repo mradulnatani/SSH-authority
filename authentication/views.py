@@ -9,6 +9,14 @@ SERVICE_ACCOUNT_FILE = 'path/to/your/service-account.json'
 ADMIN_EMAIL = 'admin@yourdomain.com'
 SCOPES = ['https://www.googleapis.com/auth/admin.directory.group.readonly']
 
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+
+def logout_view(request):
+    """Logs out the user and redirects to the login page."""
+    logout(request)
+    return redirect('index')  
+
 
 def index(request):
     # Change this to render index.html which should be your login page

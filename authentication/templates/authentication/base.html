@@ -22,8 +22,12 @@
                     <li><a href="{% url 'upload_key' %}"><i class="fas fa-key"></i> SSH Key</a></li>
                     <li><a href="{% url 'activity_log' %}"><i class="fas fa-history"></i> Activity</a></li>
                     <li><a href="{% url 'ssh_access' %}"><i class="fas fa-server"></i> Servers</a></li>
-                    <li><a href="{% url 'logout' %}" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
-                </ul>
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </form>
             </nav>
             {% endif %}
         </div>

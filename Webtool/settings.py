@@ -15,6 +15,11 @@ import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_URL = '/static/'
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'staticfiles'),
+]
 
 
 # Quick-start development settings - unsuitable for production
@@ -160,7 +165,7 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = '372071568923-k7nj82cp9o8saprkvbd769shnh1igkht.a
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = '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'
 
 LOGIN_URL = '/authentication/'
-LOGOUT_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/authentication/'
 
 LOGIN_REDIRECT_URL = '/authentication/role-form/'
 
