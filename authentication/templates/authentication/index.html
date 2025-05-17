@@ -1,97 +1,195 @@
-<style>
-    /* General reset and font */
-body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f4f6f9;
-    color: #333;
-}
+{% extends 'authentication/base.html' %}
 
-/* Centering container */
-.login-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-
-/* Box styling */
-.login-box {
-    background-color: #fff;
-    padding: 40px 30px;
-    border-radius: 12px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    width: 100%;
-    max-width: 420px;
-}
-
-/* Logo */
-.login-logo {
-    width: 80px;
-    height: auto;
-    margin-bottom: 20px;
-}
-
-/* Headings */
-.login-box h2 {
-    margin-bottom: 10px;
-    font-size: 24px;
-    color: #2c3e50;
-}
-
-.login-box p {
-    font-size: 15px;
-    margin-bottom: 30px;
-    color: #555;
-}
-
-/* Google sign-in button */
-.google-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgb(11, 11, 151);
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 10px 16px;
-    font-size: 16px;
-    text-decoration: none;
-    color: white;
-    transition: background-color 0.3s ease;
-    width: 100%;
-    max-width: 280px;
-    margin: auto;
-}
-
-.google-btn img {
-    width: 20px;
-    margin-right: 10px;
-}
-
-.google-btn:hover {
-    background-color: #6792e2;
-    border-color: #aaa;
-    color: black;
-    cursor: pointer;
-}
-</style>
 {% block title %}TechRizzy - Login{% endblock %}
+
+{% block extra_styles %}
+<style>
+    /* Remove header and footer for login page */
+    header, footer {
+        display: none;
+    }
+    
+    body {
+        background-color: #f5f5f5;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    main.container {
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+    
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100%;
+    }
+
+    .login-box {
+        background-color: #ffffff;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        width: 100%;
+        max-width: 420px;
+        margin: 0 auto;
+    }
+
+    .login-image {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 20px;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .login-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .login-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .login-subtitle {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .input-field {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        box-sizing: border-box;
+        margin-bottom: 15px;
+    }
+    
+    .submit-btn {
+        width: 100%;
+        background-color: #4285f4;
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 4px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: 20px;
+    }
+    
+    .divider {
+        text-align: center;
+        margin: 20px 0;
+        color: #666;
+        position: relative;
+    }
+    
+    .divider hr {
+        margin: 0;
+        border: none;
+        border-top: 1px solid #ddd;
+    }
+    
+    .divider-text {
+        position: absolute;
+        top: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: white;
+        padding: 0 15px;
+    }
+    
+    .google-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        background-color: #4285f4;
+        color: white;
+        text-decoration: none;
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 14px;
+        border: none;
+        cursor: pointer;
+    }
+
+    .google-btn:hover {
+        background-color: #3367d6;
+    }
+    
+    .google-icon {
+        background-color: white;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+    }
+    
+    .alert {
+        padding: 0.8rem;
+        margin-bottom: 1.5rem;
+        border-radius: 4px;
+        font-size: 0.95rem;
+        text-align: left;
+    }
+    
+    .alert-danger {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #f87171;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="login-container">
     <div class="login-box">
-        <img src="" alt="TechRizzy Logo" class="login-logo">
-        <h2><b>TechRizzy SSH Certificate Portal</b></h2>
-        <p>Sign in with your company account</p>
-        
-        <div class="login-buttons">
-            <a href="{% url 'social:begin' 'google-oauth2' %}" class="google-btn">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google logo">
-                Sign in with Google
-            </a>
+        <div class="login-image">
+            <img src="" alt="Logo">
         </div>
+        
+        <h1 class="login-title">TechRizzy SSH Certificate Portal</h1>
+        <p class="login-subtitle">Sign in with your company account</p>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-danger">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <!-- Email/Password Login Form -->
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="login_method" value="standard">
+            <input type="email" name="email" placeholder="Email" required class="input-field">
+            <input type="password" name="password" placeholder="Password" required class="input-field">
+            <button type="submit" class="submit-btn">Sign in</button>
+        </form>
     </div>
 </div>
 {% endblock %}
