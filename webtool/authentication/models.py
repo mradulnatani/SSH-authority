@@ -7,15 +7,21 @@ import uuid
 # -------------------------
 
 class CustomUser(AbstractUser):
+    PREDEFINED_GROUPS = [
+        ('dev', 'Developer'),
+        ('qa', 'QA'),
+        ('prod', 'Production'),
+        ('admin', 'Admin'),
+    ]
+
     email = models.EmailField(unique=True)
-    group = models.ForeignKey('Group', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    group = models.CharField(max_length=50, choices=PREDEFINED_GROUPS)  # restrict to choices
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']  # required when creating superuser
+    REQUIRED_FIELDS = ['username', 'group']  # include group here
 
     def __str__(self):
         return self.email
-
 
 # -------------------------
 # 2. Group Model
