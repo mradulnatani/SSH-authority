@@ -6,17 +6,9 @@ import uuid
 # 1. Custom User Model
 # -------------------------
 
-class CustomUser(AbstractUser):
-    PREDEFINED_GROUPS = [
-        ('dev', 'Developer'),
-        ('qa', 'QA'),
-        ('prod', 'Production'),
-        ('admin', 'Admin'),
-    ]
-
+class CustomUser(AbstractUser):  
     email = models.EmailField(unique=True)
-    group = models.CharField(max_length=50, choices=PREDEFINED_GROUPS)  # restrict to choices
-
+    group = models.ForeignKey('Group', on_delete=models.CASCADE)
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'group']  # include group here
 
