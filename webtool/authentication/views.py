@@ -5,11 +5,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from .serializers import CustomTokenObtainPairSerializer, UserSerializer
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .models import Group
-
+from .models import PublicKey
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -50,3 +51,19 @@ def receive_tags(request):
         "created_groups": created_groups,
         "received_tags": tags
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def pub_key(request):
+    print("Raw request data:", request.data)
+    
+    key_data = request.data.get('key')
+
+    if not key_data:
+        return Response({'error': 'Public key is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # saves the key to the DB
+    PublicKey.objects.create(user=request.user, key_data=key_data)
+
+    return Response({'message': 'Public key uploaded successfully.'}, status=status.HTTP_201_CREATED)

@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.urls import path
 from authentication.views import CustomTokenObtainPairView, CustomTokenRefreshView, RegisterView
 from authentication.views import receive_tags
+from authentication.views import pub_key
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -11,5 +12,5 @@ urlpatterns = [
     path('api/token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('api/register/', RegisterView.as_view(), name='register'),
     path('api/receive-tags/', receive_tags, name='receive-tags'),
-
+    path('api/pub-key/', pub_key, name='pub-key')
 ]
