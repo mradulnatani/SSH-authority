@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+  consul1:
+    image: hashicorp/consul:latest
+    hostname: consul1
+    container_name: consul1
+    ports:
+      - "8400:8400"
+      - "8500:8500"
+      - "8600:8600/udp"
+    volumes:
+      - ./consul-config:/consul/config
+    command: agent -server -bootstrap-expect=5 -node=consul1 -ui -client=0.0.0.0 -config-dir=/consul/config
+    networks:
+      - config-mgt
+
+  consul2:
+    image: hashicorp/consul:latest
+    hostname: consul2
+    container_name: consul2
+    volumes:
+      - ./consul-config:/consul/config
+    command: agent -server -node=consul2 -join=consul1 -client=0.0.0.0 -config-dir=/consul/config
+    depends_on:
+      - consul1
+    networks:
+      - config-mgt
+
+  consul3:
+    image: hashicorp/consul:latest
+    hostname: consul3
+    container_name: consul3
+    volumes:
+      - ./consul-config:/consul/config
+    command: agent -server -node=consul3 -join=consul1 -client=0.0.0.0 -config-dir=/consul/config
+    depends_on:
+      - consul1
+    networks:
+      - config-mgt
+
+  consul4:
+    image: hashicorp/consul:latest
+    hostname: consul4
+    container_name: consul4
+    volumes:
+      - ./consul-config:/consul/config
+    command: agent -server -node=consul4 -join=consul1 -client=0.0.0.0 -config-dir=/consul/config
+    depends_on:
+      - consul1
+    networks:
+      - config-mgt
+
+  consul5:
+    image: hashicorp/consul:latest
+    hostname: consul5
+    container_name: consul5
+    volumes:
+      - ./consul-config:/consul/config
+    command: agent -server -node=consul5 -join=consul1 -client=0.0.0.0 -config-dir=/consul/config
+    depends_on:
+      - consul1
+    networks:
+      - config-mgt
+
+  certificate-authority:
+    image: ubuntu:latest
+    hostname: certificate-authority
+    container_name: certificate-authority
+    volumes:
+      - ./ssh-ca:/ssh-ca
+    command: >
+      bash -c "
+      apt update &&
+      apt install -y openssh-client &&
+      rm -f /ssh-ca/id_rsa /ssh-ca/id_rsa.pub &&
+      ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key'"
+    networks:
+      - config-mgt
+  
+networks:
+  config-mgt:
+    driver: bridge
+
