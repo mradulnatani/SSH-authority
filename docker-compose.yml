@@ -83,18 +83,34 @@ services:
     container_name: confd
     restart: on-failure
     depends_on:
-      - consul1
+      - consul-lb
     volumes:
       - ./confd/templates:/etc/confd/templates:ro
       - ./confd/conf.d:/etc/confd/conf.d:ro
       - ~/.ssh/authorized_keys:/root/.ssh/authorized_keys
     command: >
-      confd
+      sh -c "sleep 20 && confd
       -backend consul
-      -node http://consul1:8500
-      -log-level debug
+      -node http://consul-lb:8500
+      -log-level debug"
     networks:
       - config-mgt
+
+
+  consul-lb:
+    image: haproxy:alpine
+    container_name: consul-lb
+    networks:
+      - config-mgt
+    ports:
+      - "18500:8500"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8500/v1/status/leader"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 networks:
  config-mgt:

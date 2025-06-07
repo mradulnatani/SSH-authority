@@ -64,6 +64,6 @@ def main():
         time.sleep(args.interval)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(filename='uploadtoconsulkv.log',level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     main()
 
