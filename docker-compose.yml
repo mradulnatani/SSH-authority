@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   consul1:
     image: hashicorp/consul:latest
@@ -67,6 +65,7 @@ services:
     image: ubuntu:latest
     hostname: certificate-authority
     container_name: certificate-authority
+    restart: on-failure
     volumes:
       - ./ssh-ca:/ssh-ca
     command: >
@@ -74,11 +73,30 @@ services:
       apt update &&
       apt install -y openssh-client &&
       rm -f /ssh-ca/id_rsa /ssh-ca/id_rsa.pub &&
-      ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key'"
+      ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key' &&
+      tail -f /dev/null'"
     networks:
       - config-mgt
-  
+
+  confd:
+    image: dockage/confd:latest
+    container_name: confd
+    restart: on-failure
+    depends_on:
+      - consul1
+    volumes:
+      - ./confd/templates:/etc/confd/templates:ro
+      - ./confd/conf.d:/etc/confd/conf.d:ro
+      - ~/.ssh/authorized_keys:/root/.ssh/authorized_keys
+    command: >
+      confd
+      -backend consul
+      -node http://consul1:8500
+      -log-level debug
+    networks:
+      - config-mgt
+
 networks:
-  config-mgt:
+ config-mgt:
     driver: bridge
 
