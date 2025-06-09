@@ -74,7 +74,7 @@ services:
       apt install -y openssh-client &&
       rm -f /ssh-ca/id_rsa /ssh-ca/id_rsa.pub &&
       ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key' &&
-      tail -f /dev/null'"
+      tail -f /dev/null"
     networks:
       - config-mgt
 
@@ -125,6 +125,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  consul-sync:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./consul_sync.py:/app/consul_sync.py:ro
+      - ./ssh-ca/id_rsa.pub:/app/id_rsa.pub:ro  
+    command: >
+      sh -c "pip install requests && echo '>>> Running consul_sync.py' && python consul_sync.py && tail -f /dev/null"
+    networks:
+      - config-mgt
 
 
 networks:

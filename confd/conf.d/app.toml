@@ -2,5 +2,3 @@
 src = "ssh-ca.tmpl"
 dest = "/root/.ssh/authorized_keys"
 keys = ["/ca/pub-key/id_rsa.pub"]
-reload_cmd = "systemctl reload sshd"  # optional
-
