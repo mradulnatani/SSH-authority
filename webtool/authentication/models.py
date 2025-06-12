@@ -6,16 +6,14 @@ import uuid
 # 1. Custom User Model
 # -------------------------
 
-class CustomUser(AbstractUser):
+class CustomUser(AbstractUser):  
     email = models.EmailField(unique=True)
-    group = models.ForeignKey('Group', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
-
+    group = models.ForeignKey('Group', on_delete=models.CASCADE)
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']  # required when creating superuser
+    REQUIRED_FIELDS = ['username', 'group']  # include group here
 
     def __str__(self):
         return self.email
-
 
 # -------------------------
 # 2. Group Model
@@ -24,6 +22,7 @@ class CustomUser(AbstractUser):
 class Group(models.Model):
     name = models.CharField(max_length=100, unique=True)
     server_tags = models.TextField(help_text="Comma-separated tags like dev, qa, prod")
+    users = models.ManyToManyField('CustomUser', related_name='custom_groups')
 
     def __str__(self):
         return self.name
@@ -36,6 +35,7 @@ class Group(models.Model):
 class PublicKey(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='public_keys')
     key_data = models.TextField()
+    signed = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
