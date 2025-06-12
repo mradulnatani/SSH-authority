@@ -62,21 +62,23 @@ services:
       - config-mgt
 
   certificate-authority:
-    image: ubuntu:latest
+    image: ghcr.io/linuxserver/openssh-server:latest
     hostname: certificate-authority
     container_name: certificate-authority
     restart: on-failure
     volumes:
       - ./ssh-ca:/ssh-ca
+      - ./sign.sh:/usr/local/bin/sign.sh
     command: >
       bash -c "
-      apt update &&
-      apt install -y openssh-client &&
-      rm -f /ssh-ca/id_rsa /ssh-ca/id_rsa.pub &&
-      ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key' &&
+      chmod +x /usr/local/bin/sign.sh &&
+      if [ ! -f /ssh-ca/id_rsa ]; then
+        ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key';
+      fi &&
       tail -f /dev/null"
     networks:
       - config-mgt
+
 
   confd:
     image: dockage/confd:latest
@@ -86,6 +88,7 @@ services:
       - ./confd/templates:/etc/confd/templates:ro
       - ./confd/conf.d:/etc/confd/conf.d:ro
       - ~/.ssh/authorized_keys:/root/.ssh/authorized_keys
+      - /etc/ssh/trusted-user-ca-keys.pem:/etc/ssh/trusted-user-ca-keys.pem
     command: >
       sh -c "sleep 20 && confd
       -backend consul

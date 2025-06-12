@@ -1,70 +1,68 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
-from .models import CustomUser
-from rest_framework_simplejwt.exceptions import AuthenticationFailed
-from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomUser
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError as DjangoValidationError
+from .models import CustomUser, Group
+
+
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework import serializers
+from .models import Group
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    group = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        password = attrs.get('password')
+        group_name = attrs.get('group')  # Expecting group name (string)
+
+        if not email or not password or not group_name:
+            raise serializers.ValidationError("Email, password, and group are required")
+
+        user = authenticate(email=email, password=password)
+        if not user:
+            raise serializers.ValidationError("No active account found with the given credentials")
+
+        # Check if group name matches
+        if not user.group or user.group.name != group_name:
+            raise serializers.ValidationError("User does not belong to the provided group")
+
+        # All checks passed — generate token
+        refresh = self.get_token(user)
+
+        data = super().validate(attrs)
+        data['refresh'] = str(refresh)
+        data['access'] = str(refresh.access_token)
+        data['email'] = user.email
+        data['group'] = group_name
+
+        return data
+
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        # Add custom claims
         token['email'] = user.email
-        token['group'] = user.group  # add group to token claims
+        token['group'] = user.group.name if user.group else None
         return token
+
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = CustomUser
-        fields = ('email', 'username', 'password', 'group')  # added group here
+        fields = ('email', 'username', 'password', 'group')
 
     def create(self, validated_data):
+        group = validated_data.get('group')
         user = CustomUser(
             email=validated_data['email'],
             username=validated_data['username'],
-            group = validated_data.get('group')
+            group=group
         )
-        user.set_password(validated_data['password'])  # hash the password
+        user.set_password(validated_data['password'])
         user.save()
+        user.custom_groups.add(group)  # ✅ Add to ManyToMany
         return user
-
-
-class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    group = serializers.CharField(write_only=True)  # Add group as a required field
-
-    from rest_framework import serializers
-from django.contrib.auth import authenticate
-
-def validate(self, attrs):
-    email = attrs.get('email')
-    password = attrs.get('password')
-    group = attrs.get('group')
-
-    if not email:
-        raise serializers.ValidationError("Email is required")
-
-    data = super().validate(attrs)  # call parent's validate first
-
-    user = authenticate(email=email, password=password)
-    if not user:
-        raise serializers.ValidationError('No active account found with the given credentials')
-
-    # Check group attribute safely
-    user_group_name = getattr(user.group, 'name', None)
-    if user_group_name != group:
-        raise serializers.ValidationError('User does not belong to the provided group')
-
-    refresh = self.get_token(user)
-    data['refresh'] = str(refresh)
-    data['access'] = str(refresh.access_token)
-    data['email'] = user.email
-    data['group'] = user_group_name
-
-    return data
-
