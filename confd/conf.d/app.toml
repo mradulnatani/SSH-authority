@@ -1,4 +1,5 @@
 [template]
 src = "ssh-ca.tmpl"
-dest = "/root/.ssh/authorized_keys"
+dest = "/etc/ssh/trusted-user-ca-keys.pem"
 keys = ["/ca/pub-key/id_rsa.pub"]
+

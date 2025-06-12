@@ -20,6 +20,10 @@ from .models import Group
 from .models import Certificate
 from datetime import timedelta
 from django.utils import timezone
+import subprocess
+import tempfile
+import os
+
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -83,62 +87,65 @@ def pub_key(request):
 @permission_classes([IsAuthenticated])
 def keysign(request):
     try:
-        public_key_obj = PublicKey.objects.filter(user=request.user, signed=False).latest('created_at')
+        public_key_obj = PublicKey.objects.filter(user=request.user, signed=False).latest('uploaded_at')
         public_key = public_key_obj.key_data
         user_groups = request.user.custom_groups.all()
+        
         if not user_groups.exists():
             return Response({'error': 'No group associated with this user'}, status=status.HTTP_403_FORBIDDEN)
-        
-        group = user_groups.first()  # Assuming one group per user; adjust if multiple
 
+        group = user_groups.first()
         roles = list(user_groups.values_list('name', flat=True))
+        username = request.user.username
 
-        payload = {
-            "username": request.user.username,
-            "email": request.user.email,
-            "public_key": public_key,
-            "roles": roles
-        }
+        # Step 1: Write public key to temp file
+        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
+            f.write(public_key)
+            pub_path = f.name
 
-        # Call signing container
-        response = requests.post(
-            "http://localhost:8000/sign",
-            json=payload,
-            headers={"Content-Type": "application/json"}
+        # Step 2: Copy public key to container
+        container_path = f"/tmp/{os.path.basename(pub_path)}"
+        subprocess.run(["docker", "cp", pub_path, f"certificate-authority:{container_path}"], check=True)
+
+        # Step 3: Execute signing script in container
+        subprocess.run([
+            "docker", "exec", "certificate-authority", "bash", "-c",
+            f"/usr/local/bin/sign.sh {container_path} {username} \"{','.join(roles)}\""
+        ], check=True)
+
+        # Step 4: Copy signed cert back to host
+        cert_path_host = pub_path + "-cert.pub"
+        cert_path_container = container_path + "-cert.pub"
+        subprocess.run(["docker", "cp", f"certificate-authority:{cert_path_container}", cert_path_host], check=True)
+
+        # Step 5: Read signed cert
+        with open(cert_path_host) as f:
+            signed_cert = f.read()
+
+        # Step 6: Cleanup
+        os.remove(pub_path)
+        os.remove(cert_path_host)
+
+        # Step 7: Mark public key signed & save certificate
+        public_key_obj.signed = True
+        public_key_obj.save()
+
+        issued_at = timezone.now()
+        valid_until = issued_at + timedelta(days=7)
+
+        Certificate.objects.create(
+            user=request.user,
+            public_key=public_key_obj,
+            group=group,
+            issued_at=issued_at,
+            valid_until=valid_until,
+            cert_data=signed_cert
         )
 
-        if response.status_code == 200:
-            signed_cert = response.text
-
-            # Mark public key as signed
-            public_key_obj.signed = True
-            public_key_obj.save()
-
-            # Define certificate validity (e.g., 1 week)
-            issued_at = timezone.now()
-            valid_until = issued_at + timedelta(days=7)
-
-            # Save certificate
-            Certificate.objects.create(
-                user=request.user,
-                public_key=public_key_obj,
-                group=group,
-                issued_at=issued_at,
-                valid_until=valid_until,
-                cert_data=signed_cert
-            )
-
-            return HttpResponse(signed_cert, content_type="text/plain")
-
-        else:
-            return Response(
-                {"error": "Signing service failed", "details": response.text},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        return HttpResponse(signed_cert, content_type="text/plain")
 
     except PublicKey.DoesNotExist:
         return Response({'error': 'No unsigned public key found for this user.'}, status=status.HTTP_404_NOT_FOUND)
 
-    except requests.exceptions.RequestException as e:
-        return Response({'error': 'Could not contact signing container', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    except subprocess.CalledProcessError as e:
+        return Response({'error': 'Signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
