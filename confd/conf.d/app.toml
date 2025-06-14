@@ -1,5 +1,9 @@
 [template]
 src = "ssh-ca.tmpl"
 dest = "/etc/ssh/trusted-user-ca-keys.pem"
+mode = "0644"
+owner = "root"
+group = "root"
 keys = ["/ca/pub-key/id_rsa.pub"]
+reload_cmd = "systemctl restart ssh"  # Optional: only if safe to restart
 

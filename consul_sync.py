@@ -7,7 +7,7 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser(description="Watch a file and upload its contents to Consul KV store.")
     parser.add_argument("--file", default="./id_rsa.pub", help="Path of file to watch")
-    parser.add_argument("--consul-url", default="http://consul-lb-1:8500", help="Consul server URL")
+    parser.add_argument("--consul-url", default="http://consul-lb:8500", help="Consul server URL")
     parser.add_argument("--kv-key", default="ca/pub-key/id_rsa.pub", help="Consul KV key to store the file content")
     parser.add_argument("--token", default=None, help="Consul ACL token")
     parser.add_argument("--interval", type=int, default=2, help="Polling interval in seconds")

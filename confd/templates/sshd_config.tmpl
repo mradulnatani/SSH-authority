@@ -1,0 +1,16 @@
+# sshd_config managed by confd
+
+Port 22
+Protocol 2
+PermitRootLogin no
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding yes
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+# Certificates
+HostCertificate /home/mradul/ssh_host_rsa_key-cert.pub
+TrustedUserCAKeys /etc/ssh/ca.pub
+
