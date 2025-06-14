@@ -1,0 +1,6 @@
+[template]
+src = "create_users.sh.tmpl"
+dest = "/tmp/create_users.sh"
+mode = "0755"
+keys = ["/env/user_roles"]
+

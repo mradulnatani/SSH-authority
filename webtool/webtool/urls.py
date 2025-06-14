@@ -6,6 +6,7 @@ from authentication.views import CustomTokenObtainPairView, CustomTokenRefreshVi
 from authentication.views import receive_tags
 from authentication.views import pub_key
 from authentication.views import keysign
+from authentication.views import get_user
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -13,5 +14,6 @@ urlpatterns = [
     path('api/register/', RegisterView.as_view(), name='register'),
     path('api/receive-tags/', receive_tags, name='receive-tags'),
     path('api/pub-key/', pub_key, name='pub-key'),
-    path('api/keysign', keysign, name='key-sign')
+    path('api/keysign', keysign, name='key-sign'),
+    path('api/get-user/', get_user, name='get-user')
 ]

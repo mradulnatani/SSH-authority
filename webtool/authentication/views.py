@@ -23,6 +23,9 @@ from django.utils import timezone
 import subprocess
 import tempfile
 import os
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -149,3 +152,14 @@ def keysign(request):
 
     except subprocess.CalledProcessError as e:
         return Response({'error': 'Signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user(request):
+    roles = list(request.user.custom_groups.values_list('name', flat=True))
+
+    with open('../user_roles.txt', 'w') as f:
+        for role in roles:
+            f.write(f"{role}\n")
+
+    return Response({'roles': roles})

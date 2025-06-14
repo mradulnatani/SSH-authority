@@ -80,47 +80,13 @@ services:
       - config-mgt
 
 
-  confd:
-    image: dockage/confd:latest
-    container_name: confd
-    restart: on-failure
-    volumes:
-      - ./confd/templates:/etc/confd/templates:ro
-      - ./confd/conf.d:/etc/confd/conf.d:ro
-      - ~/.ssh/authorized_keys:/root/.ssh/authorized_keys
-      - /etc/ssh/trusted-user-ca-keys.pem:/etc/ssh/trusted-user-ca-keys.pem
-    command: >
-      sh -c "sleep 20 && confd
-      -backend consul
-      -node http://consul-lb-1:8500
-      -node http://consul-lb-2:8500
-      -log-level debug"
-    networks:
-      - config-mgt
-
-
-  consul-lb-1:
+  consul-lb:
     image: haproxy:alpine
-    container_name: consul-lb-1
+    container_name: consul-lb
     networks:
       - config-mgt
     ports:
       - "18500:8500"
-    volumes:
-      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8500/v1/status/leader"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  consul-lb-2:
-    image: haproxy:alpine
-    container_name: consul-lb-2
-    networks:
-      - config-mgt
-    ports:
-      - "19500:8500"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
     healthcheck:
