@@ -83,6 +83,7 @@ services:
   consul-lb:
     image: haproxy:alpine
     container_name: consul-lb
+    hostname: consul_lb
     networks:
       - config-mgt
     ports:
@@ -90,7 +91,7 @@ services:
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8500/v1/status/leader"]
+      test: ["CMD-SHELL", "nc -z localhost 8500"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -105,6 +106,24 @@ services:
       sh -c "pip install requests && echo '>>> Running consul_sync.py' && python consul_sync.py && tail -f /dev/null"
     networks:
       - config-mgt
+
+
+
+  ssh-ca:
+    build: .
+    container_name: ssh-ca
+    ports:
+      - "2222:22"
+    volumes:
+      - ./confd/conf.d:/etc/confd/conf.d:ro
+      - ./confd/templates:/etc/confd/templates:ro
+    command: >
+      bash -c "
+      tail -f /dev/null"
+    networks: 
+      - config-mgt
+    depends_on:
+      - consul-lb
 
 
 networks:

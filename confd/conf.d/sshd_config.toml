@@ -2,5 +2,5 @@
 src = "sshd_config.tmpl"
 dest = "/etc/ssh/sshd_config"
 mode = "0644"
-reload_cmd = "systemctl restart sshd"
+reload_cmd = "/etc/init.d/ssh restart"
 
