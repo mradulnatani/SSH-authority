@@ -5,5 +5,5 @@ mode = "0644"
 owner = "root"
 group = "root"
 keys = ["/ca/pub-key/id_rsa.pub"]
-reload_cmd = "systemctl restart ssh"
+reload_cmd = "/etc/init.d/ssh restart"
 
