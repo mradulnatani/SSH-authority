@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CertifyPro — Secure SSH Certificate Authority</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    header {
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(10px);
+      padding: 20px 60px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: bold;
+      color: #60a5fa;
+      letter-spacing: 1px;
+    }
+
+    nav a {
+      margin-left: 30px;
+      color: #f1f5f9;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+
+    nav a:hover {
+      color: #38bdf8;
+    }
+
+    .hero {
+      height: 60vh;
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 30px;
+      text-align: center;
+      position: relative;
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      max-width: 700px;
+      color: #cbd5e1;
+      margin-bottom: 40px;
+    }
+
+    .cta-btn {
+      background-color: #3b82f6;
+      padding: 14px 32px;
+      color: white;
+      font-size: 1rem;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      font-weight: bold;
+    }
+
+    .cta-btn:hover {
+      background-color: #2563eb;
+      transform: translateY(-2px);
+    }
+
+    section {
+      padding: 80px 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .section-title {
+      font-size: 2.5rem;
+      text-align: center;
+      margin-bottom: 20px;
+      color: #f8fafc;
+    }
+
+    .section-desc {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 1rem;
+      margin-bottom: 60px;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+    }
+
+    .feature {
+      background: rgba(30, 41, 59, 0.5);
+      padding: 30px;
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .feature:hover {
+      transform: translateY(-5px);
+    }
+
+    .feature h3 {
+      color: #93c5fd;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    .feature p {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+
+    .steps {
+      max-width: 800px;
+      margin: auto;
+    }
+
+    .step {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 40px;
+    }
+
+    .step-number {
+      background-color: #3b82f6;
+      color: white;
+      font-weight: bold;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 36px;
+      font-size: 1rem;
+    }
+
+    .step-content h4 {
+      font-size: 1.1rem;
+      color: #60a5fa;
+      margin-bottom: 6px;
+    }
+
+    .step-content p {
+      color: #e2e8f0;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      background: #1e293b;
+      padding: 30px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: #60a5fa;
+      margin: 0 10px;
+    }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.2rem; }
+      .step { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">CertifyPro</div>
+  <nav>
+    <a href="/login/">Login</a>
+    <a href="/register/">Register</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1>Next-Gen SSH Certificate Authority</h1>
+  <p>CertifyPro simplifies SSH access management with short-lived, group-bound certificates — signed inside isolated Docker containers, remotely or locally.</p>
+  <a href="/register/" class="cta-btn">Start Securing Access</a>
+</section>
+
+<section>
+  <h2 class="section-title">Why Choose CertifyPro?</h2>
+  <p class="section-desc">Perfect for DevOps teams, engineers, and organizations looking to enforce identity-based access with secure, auditable SSH certificates.</p>
+
+  <div class="features">
+    <div class="feature">
+      <h3>🔐 Identity-Aware Authentication</h3>
+      <p>Log in with JWT and get role-based SSH certificates that expire automatically.</p>
+    </div>
+    <div class="feature">
+      <h3>🐳 Remote Docker Signing</h3>
+      <p>Sign certificates from remote servers using Docker containers — securely isolated from your host.</p>
+    </div>
+    <div class="feature">
+      <h3>📁 Certificate Auditing</h3>
+      <p>Every certificate issued is logged with timestamps, key hashes, and user groups.</p>
+    </div>
+    <div class="feature">
+      <h3>🧠 Role-Driven Access</h3>
+      <p>Each certificate is tied to group roles like 'devops' or 'qa' for scoped access.</p>
+    </div>
+    <div class="feature">
+      <h3>⚙️ Configurable Expiry</h3>
+      <p>Set how long certificates remain valid — from minutes to days — for max security.</p>
+    </div>
+    <div class="feature">
+      <h3>📡 Multi-Server Ready</h3>
+      <p>Sign from any server in your fleet via secure triggers and REST API integration.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">How It Works</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h4>Authenticate</h4>
+        <p>User logs in using email, password, and group. JWT access token is issued.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h4>Upload Key</h4>
+        <p>User submits their SSH public key via the dashboard interface.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h4>Trigger Signing</h4>
+        <p>Key is signed remotely by the Certificate Authority container, generating a cert.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <h4>Access Systems</h4>
+        <p>SSH into your servers using the signed certificate — secure, scoped, and short-lived.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  &copy; 2025 CertifyPro · <a href="#">Terms</a> · <a href="#">Privacy</a>
+</footer>
+
+</body>
+</html>

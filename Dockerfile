@@ -22,12 +22,15 @@ RUN useradd -m -s /bin/bash devops && \
     chown -R backend:backend /home/backend/.ssh && \
     chown -R frontend:frontend /home/frontend/.ssh
 
-RUN mkdir -p /etc/confd/{conf.d,templates}
+COPY confd/conf.d /etc/confd/conf.d
+COPY confd/templates /etc/confd/templates
 
 COPY run_confd.sh /usr/local/bin/run_confd.sh
 RUN chmod +x /usr/local/bin/run_confd.sh
 
 EXPOSE 22
+WORKDIR /usr/local/bin
 
-CMD ["./usr/local/bin/run_confd.sh"]
+# ✅ Start confd at container runtime
+CMD ["/usr/local/bin/run_confd.sh"]
 

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Submit Public Key</title>
+</head>
+<body>
+  <h2>🔐 Submit Your Public Key</h2>
+
+  <textarea id="publicKey" rows="10" cols="60" placeholder="Paste your SSH public key here..."></textarea><br><br>
+  <button id="uploadBtn">Upload Key</button>
+  <p id="status"></p>
+  <br>
+  <button onclick="window.location.href='/dashboard/'">Back to Dashboard</button>
+
+  <script>
+    document.getElementById("uploadBtn").addEventListener("click", () => {
+      const key = document.getElementById("publicKey").value.trim();
+      const token = localStorage.getItem("access");
+
+      if (!key) {
+        document.getElementById("status").innerText = "❗ Please paste your public key.";
+        return;
+      }
+
+      fetch("/api/pub-key/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ key: key })
+      })
+      .then(response => response.json().then(data => ({ status: response.status, body: data })))
+      .then(({ status, body }) => {
+        if (status === 201) {
+          document.getElementById("status").innerText = "✅ Public key uploaded successfully!";
+          document.getElementById("publicKey").value = "";
+        } else {
+          document.getElementById("status").innerText = "❌ Failed: " + JSON.stringify(body);
+        }
+      })
+      .catch(err => {
+        document.getElementById("status").innerText = "❌ Error: " + err;
+      });
+    });
+  </script>
+</body>
+</html>

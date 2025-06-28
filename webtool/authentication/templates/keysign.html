@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Key Signing Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 700px;
+      margin: auto;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+    #certificate {
+      white-space: pre-wrap;
+      background: #f1f1f1;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Get Your Public Key Signed</h2>
+
+  <label for="publicKey">Paste your Public Key:</label><br>
+  <textarea id="publicKey" placeholder="ssh-rsa AAAAB3Nza..."></textarea>
+
+  <button onclick="signKey()">Sign Key</button>
+
+  <h3>Signed Certificate:</h3>
+  <div id="certificate">Your signed certificate will appear here.</div>
+
+  <script>
+    async function signKey() {
+      const key = document.getElementById("publicKey").value;
+      const certDiv = document.getElementById("certificate");
+      
+      if (!key.trim()) {
+        certDiv.innerText = "Please paste a valid public key.";
+        return;
+      }
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/keysign", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ public_key: key })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}`);
+        }
+
+        const data = await response.json();
+        certDiv.innerText = data.certificate || "No certificate received.";
+      } catch (error) {
+        certDiv.innerText = `Error: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
