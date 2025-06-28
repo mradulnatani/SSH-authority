@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+</head>
+<body>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+  
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 60px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+  
+    h2 {
+      color: #60a5fa;
+      font-size: 28px;
+      margin-bottom: 25px;
+    }
+  
+    form {
+      background: rgba(30, 41, 59, 0.85);
+      padding: 35px 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      max-width: 420px;
+      width: 100%;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+  
+    label {
+      font-weight: 500;
+      display: block;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+  
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f1f5f9;
+      font-size: 14px;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+  
+    input:focus {
+      border-color: #3b82f6;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+  
+    button[type="submit"] {
+      width: 100%;
+      background-color: #3b82f6;
+      color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+  
+    button[type="submit"]:hover {
+      background-color: #2563eb;
+    }
+  
+    #response {
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 500;
+      color: #f87171;
+    }
+  
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  
+    @media (max-width: 500px) {
+      form {
+        padding: 25px 20px;
+      }
+    }
+  </style>
+    
+  <h2>Login</h2>
+  <form id="loginForm">
+    <label>Username:</label><br>
+    <input type="text" id="username" required><br><br>
+
+    <label>Email:</label><br>
+    <input type="email" id="email" required><br><br>
+
+    <label>Password:</label><br>
+    <input type="password" id="password" required><br><br>
+
+    <label>Group:</label><br>
+    <input type="text" id="group" required><br><br>
+
+    <button type="submit">Login</button>
+  </form>
+
+  <p id="response"></p>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const username = document.getElementById("username").value;
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const group = document.getElementById("group").value;
+
+      fetch("/api/token/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username, email, password, group })
+      })
+      .then(response => response.json().then(data => ({ status: response.status, body: data })))
+      .then(({ status, body }) => {
+        if (status === 200) {
+          // ✅ Save the token (for now using localStorage)
+          localStorage.setItem("access", body.access);
+          localStorage.setItem("refresh", body.refresh);
+
+          // ✅ Optional: redirect to a protected page
+          window.location.href = "/dashboard/";  // Or any other page
+        } else {
+          document.getElementById("response").innerText = "Login failed: " + JSON.stringify(body);
+        }
+      })
+      .catch(error => {
+        document.getElementById("response").innerText = "Error: " + error;
+      });
+    });
+  </script>
+</body>
+</html>

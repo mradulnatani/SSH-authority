@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard</title>
+</head>
+<body>
+  <h2>Welcome</h2>
+
+  <div id="userInfo">
+    <p><strong>Loading user info...</strong></p>
+  </div>
+
+  <button id="submitKeyBtn">Submit Public Key to Issue Certificate</button>
+  <br><br>
+
+  <script>
+    function parseJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = decodeURIComponent(atob(base64Url).split('').map(c =>
+          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        ).join(''));
+        return JSON.parse(base64);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    const token = localStorage.getItem("access");
+    if (!token) {
+      window.location.href = "/login/";
+    } else {
+      const payload = parseJwt(token);
+      if (payload) {
+        document.getElementById("userInfo").innerHTML = `
+          <p>📧 <strong>Email:</strong> ${payload.email || 'N/A'}</p>
+          <p>👥 <strong>Group:</strong> ${payload.group || 'N/A'}</p>
+        `;
+      } else {
+        document.getElementById("userInfo").innerText = "Invalid token.";
+      }
+    }
+
+    document.getElementById("submitKeyBtn").addEventListener("click", () => {
+      window.location.href = "/submit-key/";
+    });
+
+  </script>
+</body>
+</html>

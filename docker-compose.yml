@@ -96,6 +96,7 @@ services:
       timeout: 3s
       retries: 5
 
+
   consul-sync:
     image: python:3.11-slim
     working_dir: /app

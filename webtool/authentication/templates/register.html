@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register</title>
+</head>
+<body>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+  
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 50px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+  
+    h2 {
+      color: #60a5fa;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+  
+    form {
+      background: rgba(30, 41, 59, 0.8);
+      padding: 35px 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      max-width: 420px;
+      width: 100%;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+  
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #cbd5e1;
+    }
+  
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f1f5f9;
+      font-size: 14px;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+  
+    input:focus {
+      border-color: #3b82f6;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+  
+    button[type="submit"] {
+      width: 100%;
+      background-color: #3b82f6;
+      color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 0.3s ease;
+    }
+  
+    button[type="submit"]:hover {
+      background-color: #2563eb;
+    }
+  
+    p {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+  
+    a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-weight: 500;
+    }
+  
+    a:hover {
+      text-decoration: underline;
+    }
+  
+    #result {
+      margin-top: 20px;
+      text-align: center;
+      font-weight: 500;
+      color: #f87171;
+    }
+  
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  
+    @media (max-width: 500px) {
+      form {
+        padding: 25px 20px;
+      }
+    }
+  </style>
+  
+  <h2>User Registration</h2>
+
+  <form id="registerForm">
+    <label>Email:</label><br>
+    <input type="email" id="email" required><br><br>
+
+    <label>Username:</label><br>
+    <input type="text" id="username" required><br><br>
+
+    <label>Password:</label><br>
+    <input type="password" id="password" required><br><br>
+
+    <label>Group Name:</label><br>
+    <input type="text" id="group" required><br><br>
+
+    <button type="submit">Register</button>
+    <p>Already have an account? <a href="http://127.0.0.1:8000/login/">login</a></p>
+  </form>
+
+  <p id="result"></p>
+
+  <script>
+    document.getElementById("registerForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value;
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const group = document.getElementById("group").value;
+
+      fetch("/api/register/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: email,
+          username: username,
+          password: password,
+          group: group
+        })
+      })
+      .then(response => response.json().then(data => ({ status: response.status, body: data })))
+      .then(({ status, body }) => {
+        if (status === 201) {
+          document.getElementById("result").innerText = "Registration successful! You can now log in.";
+          // Optional redirect:
+          // window.location.href = "/login/";
+        } else {
+          document.getElementById("result").innerText = "Registration failed: " + JSON.stringify(body);
+        }
+      })
+      .catch(error => {
+        document.getElementById("result").innerText = "Error: " + error;
+      });
+    });
+  </script>
+</body>
+</html>

@@ -38,7 +38,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['group'] = group_name
 
         return data
-
+    
 
     @classmethod
     def get_token(cls, user):
@@ -46,6 +46,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['email'] = user.email
         token['group'] = user.group.name if user.group else None
         return token
+
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -56,13 +57,15 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('email', 'username', 'password', 'group')
 
     def create(self, validated_data):
-        group = validated_data.get('group')
-        user = CustomUser(
-            email=validated_data['email'],
-            username=validated_data['username'],
-            group=group
-        )
-        user.set_password(validated_data['password'])
+        email = validated_data['email']
+        username = validated_data['username']
+        password = validated_data['password']
+        group = validated_data['group']  
+        user = CustomUser(email=email, username=username)
+        user.set_password(password)  
+        user.group = group  
         user.save()
-        user.custom_groups.add(group)  # ✅ Add to ManyToMany
+
+        user.custom_groups.add(group) 
+
         return user

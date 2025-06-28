@@ -7,6 +7,8 @@ from authentication.views import receive_tags
 from authentication.views import pub_key
 from authentication.views import keysign
 from authentication.views import get_user
+from django.views.generic import TemplateView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -15,5 +17,15 @@ urlpatterns = [
     path('api/receive-tags/', receive_tags, name='receive-tags'),
     path('api/pub-key/', pub_key, name='pub-key'),
     path('api/keysign', keysign, name='key-sign'),
-    path('api/get-user/', get_user, name='get-user')
+    path('api/get-user/', get_user, name='get-user'),
+
+    #Templates
+    path('login/', TemplateView.as_view(template_name="login.html"), name='login'),
+    path('register/', TemplateView.as_view(template_name="register.html"), name='register-page'),
+    path('dashboard/', TemplateView.as_view(template_name="dashboard.html"), name='dashboard'),
+    path('submit-key/', TemplateView.as_view(template_name="submit_key.html")),
+    path('keysign/', TemplateView.as_view(template_name="keysign.html")),
+    path('home/', TemplateView.as_view(template_name="index.html")),
+
+
 ]
