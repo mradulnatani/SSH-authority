@@ -68,14 +68,18 @@ services:
     restart: on-failure
     volumes:
       - ./ssh-ca:/ssh-ca
-      - ./sign.sh:/usr/local/bin/sign.sh
+      - ./sign.sh:/usr/local/bin/sign.sh/
     command: >
       bash -c "
       chmod +x /usr/local/bin/sign.sh &&
       if [ ! -f /ssh-ca/id_rsa ]; then
         ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key';
       fi &&
+      if [ ! -f /ssh-ca/id_rsa.pub ]; then
+        ssh-keygen -y -f /ssh-ca/id_rsa > /ssh-ca/id_rsa.pub;
+      fi &&
       tail -f /dev/null"
+
     networks:
       - config-mgt
 
@@ -104,30 +108,13 @@ services:
       - ./consul_sync.py:/app/consul_sync.py:ro
       - ./ssh-ca/id_rsa.pub:/app/id_rsa.pub:ro  
     command: >
-      sh -c "pip install requests && echo '>>> Running consul_sync.py' && python consul_sync.py && tail -f /dev/null"
+          sh -c "pip install requests && echo '>>> Running consul_sync.py' && python consul_sync.py && tail -f /dev/null"
     networks:
       - config-mgt
-
-
-
-  ssh-ca:
-    build: .
-    container_name: ssh-ca
-    ports:
-      - "2222:22"
-    volumes:
-      - ./confd/conf.d:/etc/confd/conf.d:ro
-      - ./confd/templates:/etc/confd/templates:ro
-    command: >
-      bash -c "
-      tail -f /dev/null"
-    networks: 
-      - config-mgt
-    depends_on:
-      - consul-lb
 
 
 networks:
  config-mgt:
     driver: bridge
+
 

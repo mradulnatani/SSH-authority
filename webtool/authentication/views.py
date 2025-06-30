@@ -29,7 +29,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@18.209.167.12"
+command = f"ssh -i {pem_path} ubuntu@44.211.197.235"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -175,7 +175,7 @@ def get_user(request):
 def sign_key_on_remote_ca(request):
     try:
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "18.209.167.12"
+        REMOTE_HOST = "44.211.197.235"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 
@@ -208,8 +208,10 @@ def sign_key_on_remote_ca(request):
         remote_command = (
             f"sudo docker cp {remote_tmp_path} {REMOTE_CONTAINER}:{remote_tmp_path} && "
             f"sudo docker exec {REMOTE_CONTAINER} bash -c "
-            f"'sudo /usr/local/bin/sign.sh {remote_tmp_path} {username} \"{roles_str}\"'"
+            f"'/usr/local/bin/sign.sh {remote_tmp_path} {username} \"{roles_str}\"' && "
+            f"sudo docker cp {REMOTE_CONTAINER}:{remote_tmp_path}-cert.pub {remote_cert_path}"
         )
+
 
         subprocess.run([
             "ssh", "-i", SSH_KEY_PATH,
