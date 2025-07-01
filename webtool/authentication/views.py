@@ -27,9 +27,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from authentication.models import ActivityLog  
+
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@44.211.197.235"
+command = f"ssh -i {pem_path} ubuntu@54.227.141.195"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -160,22 +162,34 @@ def keysign(request):
     # except subprocess.CalledProcessError as e:
     #     return Response({'error': 'Signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_user(request):
-    roles = list(request.user.custom_groups.values_list('name', flat=True))
+    user = request.user
 
-    with open('../user_roles.txt', 'w') as f:
-        for role in roles:
-            f.write(f"{role}\n")
-
-    return Response({'roles': roles})
+    return JsonResponse({
+        "email": user.email or "N/A",
+        "full_name": f"{user.username}" or "N/A",
+        "group": user.group.name if user.group else "N/A",
+        "role": user.group.name,  # Add this field to model if needed
+        "date_joined": user.date_joined.strftime("%Y-%m-%d %H:%M:%S")
+    })
 
 
 def sign_key_on_remote_ca(request):
     try:
+         # ✅ Check if user already has a valid (non-expired) certificate
+        existing_cert = Certificate.objects.filter(
+            user=request.user,
+            valid_until__gt=timezone.now()
+        ).first()
+
+        if existing_cert:
+            return Response({
+                'error': 'You already have a valid certificate. You can request a new one after it expires.'
+            }, status=status.HTTP_403_FORBIDDEN)
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "44.211.197.235"
+        REMOTE_HOST = "54.227.141.195"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 
@@ -252,3 +266,75 @@ def sign_key_on_remote_ca(request):
 
     except subprocess.CalledProcessError as e:
         return Response({'error': 'Remote signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_all_certs(request):
+    user = request.user
+    certs = Certificate.objects.filter(user=user).order_by("-issued_at")
+    data = []
+    for cert in certs:
+        data.append({
+            "cert": cert.cert_data,  # <--- corrected from content to cert_data
+            "issued_at": cert.issued_at.isoformat(),
+            "valid_until": cert.valid_until.isoformat(),
+            "group": cert.group.name if cert.group else "N/A"
+        })
+    return JsonResponse({"certificates": data})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    try:
+        refresh_token = request.data.get("refresh")
+        token = RefreshToken(refresh_token)
+        token.blacklist()
+        return Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
+    except Exception as e:
+        return Response({"error": "Invalid token or already logged out"}, status=status.HTTP_400_BAD_REQUEST)
+    
+def log_activity(user, action, metadata=None):
+    ActivityLog.objects.create(user=user, action=action, metadata=metadata or {})
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def revoke_cert(request):
+    cert_id = request.data.get("cert_id")
+    cert = Certificate.objects.filter(id=cert_id, user=request.user).first()
+    if not cert:
+        return Response({"error": "Certificate not found"}, status=404)
+    
+    cert.revoked = True
+    cert.revoked_at = timezone.now()
+    cert.save()
+    log_activity(request.user, "revoked certificate", {"cert_id": cert_id})
+    return Response({"message": "Certificate revoked"})
+
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def get_activity_logs(request):
+#     logs = ActivityLog.objects.filter(user=request.user).order_by('-timestamp')[:20]
+#     return JsonResponse({
+#         "logs": [
+#             {"action": log.action, "timestamp": log.timestamp.isoformat(), "metadata": log.metadata}
+#             for log in logs
+#         ]
+#     })
+
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def certs_per_day(request):
+#     from django.db.models.functions import TruncDate
+#     from django.db.models import Count
+
+#     data = (
+#         Certificate.objects
+#         .filter(user=request.user)
+#         .annotate(date=TruncDate('issued_at'))
+#         .values('date')
+#         .annotate(count=Count('id'))
+#         .order_by('date')
+#     )
+
+#     return JsonResponse({"history": list(data)})

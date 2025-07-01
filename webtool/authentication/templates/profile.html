@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Profile - CertifyPro</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #eef5fc;
+      margin: 0;
+      padding: 0;
+    }
+
+    .navbar {
+      background-color: #2c3e50;
+      padding: 15px 30px;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .navbar h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .nav-links a {
+      color: white;
+      margin-left: 20px;
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .nav-links a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 700px;
+      background: #ffffff;
+      margin: 50px auto;
+      padding: 30px 40px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+
+    .info-group {
+      margin: 20px 0;
+    }
+
+    .info-group label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+      color: #34495e;
+    }
+
+    .info-group span {
+      color: #2d3436;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    <h1>CertifyPro</h1>
+    <div class="nav-links">
+      <a href="/dashboard/">Dashboard</a>
+      <a href="/certificates/">Issued Certificates</a>
+      <a href="#" id="logoutLink">Logout</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>User Profile</h2>
+
+    <div class="info-group">
+      <label>Email:</label>
+      <span id="email">Loading...</span>
+    </div>
+
+    <div class="info-group">
+      <label>Full Name:</label>
+      <span id="fullName">Loading...</span>
+    </div>
+
+    <div class="info-group">
+      <label>Group:</label>
+      <span id="group">Loading...</span>
+    </div>
+
+    <div class="info-group">
+      <label>Role:</label>
+      <span id="role">Loading...</span>
+    </div>
+
+    <div class="info-group">
+      <label>Joined On:</label>
+      <span id="joined">Loading...</span>
+    </div>
+  </div>
+
+  <script>
+    function parseJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = atob(base64Url.replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(base64);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    const token = localStorage.getItem("access");
+    const refresh = localStorage.getItem("refresh");
+
+    if (!token) {
+      window.location.href = "/login/";
+    } else {
+      const payload = parseJwt(token);
+      if (!payload || Date.now() >= payload.exp * 1000) {
+        localStorage.removeItem("access");
+        localStorage.removeItem("refresh");
+        window.location.href = "/login/";
+      }
+    }
+
+    // Fetch and populate user info
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    };
+
+    fetch("/api/get-user/", { headers })
+      .then(res => {
+        if (!res.ok) throw new Error("Unable to fetch user info.");
+        return res.json();
+      })
+      .then(data => {
+        document.getElementById("email").textContent = data.email || "N/A";
+        document.getElementById("fullName").textContent = data.full_name || "N/A";
+        document.getElementById("group").textContent = data.group || "N/A";
+        document.getElementById("role").textContent = data.role || "N/A";
+        document.getElementById("joined").textContent = new Date(data.date_joined).toLocaleString() || "N/A";
+      })
+      .catch(err => {
+        alert("Error: " + err.message);
+        document.getElementById("email").textContent = "Error loading user.";
+      });
+
+    // Logout logic on click
+    document.getElementById("logoutLink").addEventListener("click", function (e) {
+      e.preventDefault();
+
+      fetch("/api/logout/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ refresh })
+      })
+      .then(res => {
+        if (res.ok) {
+          localStorage.removeItem("access");
+          localStorage.removeItem("refresh");
+          window.location.href = "/login/";
+        } else {
+          alert("Logout failed. Please try again.");
+        }
+      })
+      .catch(err => {
+        console.error("Logout error:", err);
+        alert("An error occurred during logout.");
+      });
+    });
+  </script>
+
+</body>
+</html>

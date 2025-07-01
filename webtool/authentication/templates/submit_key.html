@@ -18,7 +18,7 @@
       const token = localStorage.getItem("access");
 
       if (!key) {
-        document.getElementById("status").innerText = "❗ Please paste your public key.";
+        document.getElementById("status").innerText = "Please paste your public key.";
         return;
       }
 
@@ -33,14 +33,14 @@
       .then(response => response.json().then(data => ({ status: response.status, body: data })))
       .then(({ status, body }) => {
         if (status === 201) {
-          document.getElementById("status").innerText = "✅ Public key uploaded successfully!";
+          document.getElementById("status").innerText = "Public key uploaded successfully!";
           document.getElementById("publicKey").value = "";
         } else {
-          document.getElementById("status").innerText = "❌ Failed: " + JSON.stringify(body);
+          document.getElementById("status").innerText = "Failed: " + JSON.stringify(body);
         }
       })
       .catch(err => {
-        document.getElementById("status").innerText = "❌ Error: " + err;
+        document.getElementById("status").innerText = "Error: " + err;
       });
     });
   </script>
