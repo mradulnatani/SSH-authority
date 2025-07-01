@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 import uuid
+from django.contrib.auth.models import User
+from django.conf import settings
 
 # -------------------------
 # 1. Custom User Model
@@ -54,7 +56,17 @@ class Certificate(models.Model):
     issued_at = models.DateTimeField(auto_now_add=True)
     valid_until = models.DateTimeField()
     cert_data = models.TextField()
+    revoked = models.BooleanField(default=False)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
 
     def __str__(self):
         return f"Cert {self.id} for {self.user.email}"
 
+class ActivityLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    event = models.CharField(max_length=255)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event}"

@@ -1,50 +1,318 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Dashboard</title>
+  <meta charset="UTF-8">
+  <title>CertifyPro Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #e6f0ff, #ffffff);
+      margin: 0;
+      padding: 0;
+    }
+
+    .navbar {
+      background-color: #2c3e50;
+      color: white;
+      padding: 15px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .navbar h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .nav-links a {
+      color: white;
+      text-decoration: none;
+      margin-left: 20px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .nav-links a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    #submitKeyBtn {
+      display: block;
+      margin: 20px auto;
+      padding: 12px 25px;
+      font-size: 16px;
+      background-color: #2980b9;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #submitKeyBtn:hover {
+      background-color: #21618c;
+    }
+
+    #loadingSpinner {
+      display: none;
+      margin: 30px auto;
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #certContainer {
+      display: none;
+      margin-top: 30px;
+      background-color: #fdfdfd;
+      border-left: 5px solid #27ae60;
+      border-radius: 8px;
+      padding: 20px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'Courier New', Courier, monospace;
+      color: #333;
+    }
+
+    .info-metrics {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .metric {
+      background: #ecf5ff;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px auto;
+      max-width: 500px;
+      font-size: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .progress-bar-container {
+      background: #ccc;
+      height: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      transition: width 0.3s ease-in-out;
+    }
+
+    #userInfo {
+      margin-bottom: 20px;
+    }
+  </style>
 </head>
 <body>
-  <h2>Welcome</h2>
 
-  <div id="userInfo">
-    <p><strong>Loading user info...</strong></p>
+  <div class="navbar">
+    <h1>CertifyPro</h1>
+    <div class="nav-links">
+      <a href="/dashboard/">Dashboard</a>
+      <a href="/profile/">User Profile</a>
+      <a href="/certificates/">Issued Certificates</a>
+      <a href="#" id="logoutBtn">Logout</a>
+    </div>
   </div>
 
-  <button id="submitKeyBtn">Submit Public Key to Issue Certificate</button>
-  <br><br>
+  <div class="container">
+    <h2>Welcome to the Dashboard</h2>
+    <div id="userInfo">
+      <p><strong>Loading user info...</strong></p>
+    </div>
+
+    <div class="info-metrics">
+      <div class="metric" id="certCount">Certificates Issued: Loading...</div>
+      <div class="metric" id="certExpiry">
+        Time Left for Expiration: <span id="expiryTime">Loading...</span>
+        <div class="progress-bar-container">
+          <div id="expiryProgress" class="progress-bar" style="width:0%; background: #3498db;"></div>
+        </div>
+      </div>
+    </div>
+
+    <button id="submitKeyBtn">Submit Public Key to Issue Certificate</button>
+    <div id="loadingMessage" style="text-align:center; font-weight:bold; margin-top: 20px; display:none;">
+      ⏳ Certificate is being generated, please wait...
+    </div>
+    <div id="loadingSpinner"></div>
+    <div id="certContainer"></div>
+  </div>
 
   <script>
     function parseJwt(token) {
       try {
         const base64Url = token.split('.')[1];
-        const base64 = decodeURIComponent(atob(base64Url).split('').map(c =>
-          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-        ).join(''));
+        const base64 = atob(base64Url.replace(/-/g, '+').replace(/_/g, '/'));
         return JSON.parse(base64);
       } catch (e) {
         return null;
       }
     }
 
+    function isValidSSHKey(key) {
+      const sshKeyPattern = /^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp\d+)\s+[A-Za-z0-9+/=]+(\s+.+)?$/;
+      return sshKeyPattern.test(key.trim());
+    }
+
     const token = localStorage.getItem("access");
+    const refresh = localStorage.getItem("refresh");
+
     if (!token) {
       window.location.href = "/login/";
     } else {
       const payload = parseJwt(token);
-      if (payload) {
-        document.getElementById("userInfo").innerHTML = `
-          <p>📧 <strong>Email:</strong> ${payload.email || 'N/A'}</p>
-          <p>👥 <strong>Group:</strong> ${payload.group || 'N/A'}</p>
-        `;
-      } else {
-        document.getElementById("userInfo").innerText = "Invalid token.";
+      if (!payload || Date.now() >= payload.exp * 1000) {
+        localStorage.removeItem("access");
+        localStorage.removeItem("refresh");
+        window.location.href = "/login/";
       }
     }
 
-    document.getElementById("submitKeyBtn").addEventListener("click", () => {
-      window.location.href = "/submit-key/";
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    };
+
+    const payload = parseJwt(token);
+    if (payload) {
+      document.getElementById("userInfo").innerHTML = `
+        <p><strong>Email:</strong> ${payload.email}</p>
+        <p><strong>Group:</strong> ${payload.group}</p>
+      `;
+    }
+
+    fetch("/api/certificates/", { headers })
+    .then(res => res.json())
+    .then(data => {
+      const certs = data.certificates || [];
+      const total = certs.length;
+
+      document.getElementById("certCount").textContent = `Certificates Issued: ${total}`;
+
+      if (total > 0) {
+        const latest = certs[0];
+        const issued = new Date(latest.issued_at);
+        const expires = new Date(latest.valid_until);
+        const now = new Date();
+
+        if (now < expires) {
+          const submitBtn = document.getElementById("submitKeyBtn");
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Already Issued (Wait for Expiry)";
+          submitBtn.style.backgroundColor = "#95a5a6";
+          submitBtn.style.cursor = "not-allowed";
+        }
+
+        const totalDuration = expires - issued;
+        const timeLeft = expires - now;
+        const percent = Math.max(0, Math.min(100, (timeLeft / totalDuration) * 100));
+
+        document.getElementById("expiryTime").textContent =
+          timeLeft <= 0 ? "Expired" : `${Math.round(percent)}% time remaining`;
+
+        const bar = document.getElementById("expiryProgress");
+        bar.style.width = percent + "%";
+        bar.style.backgroundColor =
+          percent < 20 ? "#e74c3c" :
+          percent < 50 ? "#f39c12" : "#27ae60";
+      } else {
+        document.getElementById("expiryTime").textContent = "No certificates issued.";
+      }
     });
 
+    document.getElementById("logoutBtn").addEventListener("click", function (e) {
+      e.preventDefault();
+      fetch("/api/logout/", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ refresh })
+      })
+      .then(res => {
+        if (res.ok) {
+          localStorage.removeItem("access");
+          localStorage.removeItem("refresh");
+          window.location.href = "/login/";
+        } else {
+          alert("Logout failed.");
+        }
+      })
+      .catch(err => {
+        console.error("Logout error", err);
+        alert("Logout error occurred.");
+      });
+    });
+
+    document.getElementById("submitKeyBtn").addEventListener("click", () => {
+      const pubKey = prompt("Paste your SSH public key:");
+      if (!pubKey) return alert("Public key is required!");
+
+      if (!isValidSSHKey(pubKey)) {
+        return alert("Invalid SSH public key format. It must begin with ssh-rsa, ssh-ed25519, or ecdsa-* and be properly encoded.");
+      }
+
+      document.getElementById("loadingMessage").style.display = "block";
+      document.getElementById("loadingSpinner").style.display = "block";
+      document.getElementById("certContainer").style.display = "none";
+      document.getElementById("certContainer").innerText = "";
+
+      fetch("/api/pub-key/", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ key: pubKey })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.message) {
+          fetch("/api/keysign/", {
+            method: "GET",
+            headers
+          })
+          .then(res => res.text())
+          .then(cert => {
+            document.getElementById("loadingSpinner").style.display = "none";
+            document.getElementById("loadingMessage").style.display = "none";
+            document.getElementById("certContainer").style.display = "block";
+            document.getElementById("certContainer").innerText = cert;
+          })
+          .catch(err => {
+            document.getElementById("loadingSpinner").style.display = "none";
+            document.getElementById("loadingMessage").style.display = "none";
+            document.getElementById("certContainer").style.display = "block";
+            document.getElementById("certContainer").innerText = "Signing failed: " + err;
+          });
+        } else {
+          alert("Key upload failed: " + JSON.stringify(data));
+          document.getElementById("loadingSpinner").style.display = "none";
+          document.getElementById("loadingMessage").style.display = "none";
+        }
+      })
+      .catch(err => {
+        alert("Error uploading key: " + err);
+        document.getElementById("loadingSpinner").style.display = "none";
+        document.getElementById("loadingMessage").style.display = "none";
+      });
+    });
   </script>
 </body>
 </html>
