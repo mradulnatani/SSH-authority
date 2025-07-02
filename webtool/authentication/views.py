@@ -31,7 +31,7 @@ from authentication.models import ActivityLog
 
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@54.227.141.195"
+command = f"ssh -i {pem_path} ubuntu@13.222.217.232"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -189,7 +189,7 @@ def sign_key_on_remote_ca(request):
                 'error': 'You already have a valid certificate. You can request a new one after it expires.'
             }, status=status.HTTP_403_FORBIDDEN)
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "54.227.141.195"
+        REMOTE_HOST = "13.222.217.232"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 
