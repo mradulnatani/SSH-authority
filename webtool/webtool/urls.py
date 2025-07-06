@@ -10,6 +10,7 @@ from authentication.views import get_user
 from django.views.generic import TemplateView
 from authentication.views import get_all_certs
 from authentication.views import logout_view
+from authentication.views import get_groups
 
 urlpatterns = [
     path('', TemplateView.as_view(template_name="index.html")),  
@@ -23,6 +24,8 @@ urlpatterns = [
     path('api/get-user/', get_user, name='get-user'),
     path("api/certificates/", get_all_certs, name="certs"),
     path("api/logout/", logout_view, name="logout"),
+    path("api/groups/", get_groups, name="get-groups"),
+
 
 
 
