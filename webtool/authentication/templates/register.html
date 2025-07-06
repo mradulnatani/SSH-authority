@@ -1,183 +1,223 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Register</title>
-</head>
-<body>
+  <meta charset="UTF-8" />
+  <title>User Registration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
+    :root {
+      --bg-color: #0f172a;
+      --form-bg: #1e293b;
+      --form-border: #334155;
+      --accent-color: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-color: #e2e8f0;
+      --muted-text: #cbd5e1;
+      --error-bg: #fee2e2;
+      --error-border: #f87171;
+      --error-text: #b91c1c;
+    }
+
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-  
+
     body {
       font-family: 'Inter', sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      margin: 0;
-      padding: 50px 20px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
       display: flex;
-      flex-direction: column;
       align-items: center;
+      justify-content: center;
+      padding: 2rem;
       min-height: 100vh;
     }
-  
-    h2 {
-      color: #60a5fa;
-      font-size: 28px;
-      margin-bottom: 20px;
-    }
-  
+
     form {
-      background: rgba(30, 41, 59, 0.8);
-      padding: 35px 30px;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-      max-width: 420px;
+      background-color: var(--form-bg);
+      padding: 2rem;
+      border-radius: 1rem;
+      max-width: 400px;
       width: 100%;
-      animation: fadeIn 0.6s ease-in-out;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.5s ease-in-out;
     }
-  
+
+    h2 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      color: var(--accent-color);
+      font-size: 1.75rem;
+    }
+
     label {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--muted-text);
       display: block;
-      margin-bottom: 6px;
-      font-weight: 500;
-      color: #cbd5e1;
     }
-  
-    input[type="text"],
-    input[type="email"],
-    input[type="password"] {
+
+    input, select {
       width: 100%;
-      padding: 12px 14px;
-      margin-bottom: 20px;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      background: #1e293b;
-      color: #f1f5f9;
-      font-size: 14px;
-      transition: border 0.3s, box-shadow 0.3s;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      background-color: #0f172a;
+      border: 1px solid var(--form-border);
+      border-radius: 0.5rem;
+      color: var(--text-color);
+      font-size: 1rem;
     }
-  
-    input:focus {
-      border-color: #3b82f6;
+
+    input:focus, select:focus {
       outline: none;
+      border-color: var(--accent-color);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
     }
-  
-    button[type="submit"] {
+
+    button {
       width: 100%;
-      background-color: #3b82f6;
+      background-color: var(--accent-color);
       color: white;
-      padding: 12px;
+      padding: 0.75rem;
       border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
+      border-radius: 0.5rem;
       font-weight: 600;
-      transition: background-color 0.3s ease;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
     }
-  
-    button[type="submit"]:hover {
-      background-color: #2563eb;
+
+    button:hover {
+      background-color: var(--accent-hover);
     }
-  
+
     p {
       text-align: center;
-      margin-top: 16px;
-      font-size: 14px;
+      font-size: 0.9rem;
+      margin-top: 1rem;
     }
-  
+
     a {
-      color: #60a5fa;
+      color: var(--accent-color);
       text-decoration: none;
       font-weight: 500;
     }
-  
+
     a:hover {
       text-decoration: underline;
     }
-  
-    #result {
-      margin-top: 20px;
+
+    #error {
+      margin-top: 1rem;
+      background-color: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+      padding: 0.75rem;
+      border-radius: 0.5rem;
       text-align: center;
       font-weight: 500;
-      color: #f87171;
     }
-  
+
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-  
+
     @media (max-width: 500px) {
-      form {
-        padding: 25px 20px;
-      }
+      form { padding: 1.5rem; }
     }
   </style>
-  
-  <h2>User Registration</h2>
+</head>
+<body>
 
   <form id="registerForm">
-    <label>Email:</label><br>
-    <input type="email" id="email" required><br><br>
+    <h2>User Registration</h2>
 
-    <label>Username:</label><br>
-    <input type="text" id="username" required><br><br>
+    <label for="email">Email:</label>
+    <input type="email" id="email" required>
 
-    <label>Password:</label><br>
-    <input type="password" id="password" required><br><br>
+    <label for="username">Username:</label>
+    <input type="text" id="username" required>
 
-    <label>Group Name:</label><br>
-    <input type="text" id="group" required><br><br>
+    <label for="password">Password:</label>
+    <input type="password" id="password" required>
+
+    <label for="group">Group Name:</label>
+    <select id="group" required>
+      <option value="">Loading groups...</option>
+    </select>
 
     <button type="submit">Register</button>
-    <p>Already have an account? <a href="http://127.0.0.1:8000/login/">login</a></p>
+
+    <p>Already have an account? <a href="/login/">Login</a></p>
+    <p id="error"></p>
   </form>
 
-  <p id="result"></p>
-
   <script>
+    // Populate group dropdown from backend
+    fetch("/api/groups/")
+      .then(response => response.json())
+      .then(groups => {
+        const groupSelect = document.getElementById("group");
+        groupSelect.innerHTML = '<option value="">Select a group</option>';
+        groups.forEach(group => {
+          const option = document.createElement("option");
+          option.value = group;
+          option.textContent = group;
+          groupSelect.appendChild(option);
+        });
+      })
+      .catch(err => {
+        document.getElementById("group").innerHTML = '<option value="">Failed to load groups</option>';
+        console.error("Group load error:", err);
+      });
+
+    // Handle registration
     document.getElementById("registerForm").addEventListener("submit", function (e) {
       e.preventDefault();
 
-      const email = document.getElementById("email").value;
-      const username = document.getElementById("username").value;
+      const email = document.getElementById("email").value.trim();
+      const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
       const group = document.getElementById("group").value;
+      const resultEl = document.getElementById("error");
+
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const usernamePattern = /^[A-Za-z_]+$/;
+
+      if (!emailPattern.test(email)) {
+        resultEl.textContent = "Please enter a valid email address.";
+        return;
+      }
+
+      if (!usernamePattern.test(username)) {
+        resultEl.textContent = "Username should contain only letters and underscores.";
+        return;
+      }
 
       fetch("/api/register/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          email: email,
-          username: username,
-          password: password,
-          group: group
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, username, password, group })
       })
-      .then(response => response.json().then(data => ({ status: response.status, body: data })))
-      .then(({ status, body }) => {
+      .then(res => res.json().then(data => ({ status: res.status, data })))
+      .then(({ status, data }) => {
         if (status === 201) {
-          document.getElementById("result").innerText = "Registration successful! You can now log in.";
-          // Optional redirect:
-          // window.location.href = "/login/";
+          resultEl.style.color = "green";
+          resultEl.textContent = "Registration successful! Redirecting...";
+          setTimeout(() => window.location.href = "/login/", 1500);
         } else {
-          document.getElementById("result").innerText = "Registration failed: " + JSON.stringify(body);
+          resultEl.style.color = "";
+          resultEl.textContent = "Registration failed: " + (data.detail || JSON.stringify(data));
         }
       })
       .catch(error => {
-        document.getElementById("result").innerText = "Error: " + error;
+        resultEl.textContent = "Error: " + error;
       });
     });
   </script>
+
 </body>
 </html>

@@ -31,7 +31,7 @@ from authentication.models import ActivityLog
 
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@44.203.131.244"
+command = f"ssh -i {pem_path} ubuntu@18.212.11.115"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -189,7 +189,7 @@ def sign_key_on_remote_ca(request):
                 'error': 'You already have a valid certificate. You can request a new one after it expires.'
             }, status=status.HTTP_403_FORBIDDEN)
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "44.203.131.244"
+        REMOTE_HOST = "18.212.11.115"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 
@@ -310,6 +310,10 @@ def revoke_cert(request):
     cert.save()
     log_activity(request.user, "revoked certificate", {"cert_id": cert_id})
     return Response({"message": "Certificate revoked"})
+
+def get_groups(request):
+    groups = Group.objects.all().values_list('name', flat=True)
+    return JsonResponse(list(groups), safe=False)
 
 # @api_view(["GET"])
 # @permission_classes([IsAuthenticated])
