@@ -51,6 +51,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    group = serializers.CharField(write_only=True)  
 
     class Meta:
         model = CustomUser
@@ -60,12 +61,19 @@ class UserSerializer(serializers.ModelSerializer):
         email = validated_data['email']
         username = validated_data['username']
         password = validated_data['password']
-        group = validated_data['group']  
+        group_name = validated_data['group']  
+
+        try:
+            group = Group.objects.get(server_tags=group_name)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError({"group": "Group not found with the given name."})
+
         user = CustomUser(email=email, username=username)
-        user.set_password(password)  
-        user.group = group  
+        user.set_password(password)
+        user.group = group
         user.save()
 
-        user.custom_groups.add(group) 
+        user.custom_groups.add(group)
 
         return user
+

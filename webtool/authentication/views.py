@@ -11,8 +11,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .models import Group
 from .models import PublicKey
-import docker
-import requests
+# import docker
+# import requests
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import PublicKey
@@ -31,7 +31,7 @@ from authentication.models import ActivityLog
 
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@13.222.217.232"
+command = f"ssh -i {pem_path} ubuntu@44.203.131.244"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -54,28 +54,28 @@ class RegisterView(APIView):
                 return Response(json, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['POST'])
 def receive_tags(request):
     print("Raw request data:", request.data)
     tags = request.data.get('tags', [])
-    print("Extracted tags:", tags)
-    tags = request.data.get('tags', [])
+    
     if not isinstance(tags, list):
         return Response({"error": "Invalid format for tags"}, status=status.HTTP_400_BAD_REQUEST)
 
     created_groups = []
+
     for tag in tags:
-        group, created = Group.objects.get_or_create(name=tag, defaults={'server_tags': tag})
+        group, created = Group.objects.get_or_create(
+            name=tag, defaults={'server_tags': tag}
+        )
         if created:
             created_groups.append(group.name)
 
     return Response({
-        "message": "Tags processed",
+        "message": "Tags processed successfully",
         "created_groups": created_groups,
         "received_tags": tags
     }, status=status.HTTP_200_OK)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -178,7 +178,7 @@ def get_user(request):
 
 def sign_key_on_remote_ca(request):
     try:
-         # ✅ Check if user already has a valid (non-expired) certificate
+         # Check if user already has a valid (non-expired) certificate
         existing_cert = Certificate.objects.filter(
             user=request.user,
             valid_until__gt=timezone.now()
@@ -189,7 +189,7 @@ def sign_key_on_remote_ca(request):
                 'error': 'You already have a valid certificate. You can request a new one after it expires.'
             }, status=status.HTTP_403_FORBIDDEN)
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "13.222.217.232"
+        REMOTE_HOST = "44.203.131.244"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 
