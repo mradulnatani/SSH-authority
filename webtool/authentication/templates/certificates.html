@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Issued Certificates - CertifyPro</title>
+  <title>Issued Certificates - EasyAccess</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -83,12 +83,27 @@
       font-style: italic;
       color: #666;
     }
+
+    .download-button {
+      margin-top: 10px;
+      padding: 8px 15px;
+      font-size: 14px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .download-button:hover {
+      background-color: #2980b9;
+    }
   </style>
 </head>
 <body>
 
   <div class="navbar">
-    <h1>CertifyPro</h1>
+    <h1>EasyAccess</h1>
     <div class="nav-links">
       <a href="/dashboard/">Dashboard</a>
       <a href="/profile/">User Profile</a>
@@ -124,13 +139,22 @@
         data.certificates.forEach(cert => {
           const certBlock = document.createElement("div");
           certBlock.className = "certificate";
+
+          const issuedDate = new Date(cert.issued_at).toLocaleString();
+          const validDate = new Date(cert.valid_until).toLocaleString();
+          const certText = cert.cert.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          const rawCertText = cert.cert;
+          const safeFilename = `certificate-${issuedDate.replace(/[/,: ]/g, "_")}.pub`;
+
           certBlock.innerHTML = `
-            <div class="certificate-label">Issued At:</div> ${new Date(cert.issued_at).toLocaleString()}<br>
-            <div class="certificate-label">Valid Until:</div> ${new Date(cert.valid_until).toLocaleString()}<br>
+            <div class="certificate-label">Issued At:</div> ${issuedDate}<br>
+            <div class="certificate-label">Valid Until:</div> ${validDate}<br>
             <div class="certificate-label">Group:</div> ${cert.group}<br>
             <div class="certificate-label">Certificate:</div>
-            <pre>${cert.cert}</pre>
+            <pre>${certText}</pre>
+            <button class="download-button" onclick="downloadCertificate(\`${rawCertText}\`, '${safeFilename}')">⬇ Download Certificate</button>
           `;
+
           container.appendChild(certBlock);
         });
       } else {
@@ -169,6 +193,19 @@
         alert("An error occurred during logout.");
       });
     });
+
+    // Function to download a certificate as a file
+    function downloadCertificate(content, filename) {
+      const blob = new Blob([content], { type: "application/x-pem-file" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   </script>
 
 </body>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CertifyPro Dashboard</title>
+  <title>EasyAccess Dashboard</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -126,7 +126,7 @@
 <body>
 
   <div class="navbar">
-    <h1>CertifyPro</h1>
+    <h1>EasyAccess</h1>
     <div class="nav-links">
       <a href="/dashboard/">Dashboard</a>
       <a href="/profile/">User Profile</a>
@@ -290,11 +290,20 @@
           })
           .then(res => res.text())
           .then(cert => {
-            document.getElementById("loadingSpinner").style.display = "none";
-            document.getElementById("loadingMessage").style.display = "none";
-            document.getElementById("certContainer").style.display = "block";
-            document.getElementById("certContainer").innerText = cert;
-          })
+  document.getElementById("loadingSpinner").style.display = "none";
+  document.getElementById("loadingMessage").style.display = "none";
+
+  document.getElementById("certContainer").innerHTML = `
+  <div style="margin-bottom: 15px;">${cert.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+  <button onclick="downloadCert(\`${cert.replace(/`/g, '\\`')}\`)" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
+    ⬇ Download Certificate
+  </button>
+`;
+
+document.getElementById("certContainer").style.display = "block";
+
+})
+
           .catch(err => {
             document.getElementById("loadingSpinner").style.display = "none";
             document.getElementById("loadingMessage").style.display = "none";
@@ -313,6 +322,18 @@
         document.getElementById("loadingMessage").style.display = "none";
       });
     });
+    function downloadCert(content) {
+  const blob = new Blob([content], { type: "application/x-pem-file" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ssh_certificate.pub";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
   </script>
 </body>
 </html>
