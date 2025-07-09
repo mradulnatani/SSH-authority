@@ -144,12 +144,10 @@
       .then(response => response.json().then(data => ({ status: response.status, body: data })))
       .then(({ status, body }) => {
         if (status === 200) {
-          // ✅ Save the token (for now using localStorage)
           localStorage.setItem("access", body.access);
           localStorage.setItem("refresh", body.refresh);
 
-          // ✅ Optional: redirect to a protected page
-          window.location.href = "/dashboard/";  // Or any other page
+          window.location.href = "/dashboard/";  
         } else {
           document.getElementById("response").innerText = "Login failed: " + JSON.stringify(body);
         }
