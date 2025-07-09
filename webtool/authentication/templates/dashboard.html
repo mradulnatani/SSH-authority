@@ -158,7 +158,30 @@
     <div id="loadingSpinner"></div>
     <div id="certContainer"></div>
   </div>
-
+  
+  <div style="text-align: center; margin-top: 30px;">
+    <div style="
+      display: inline-block;
+      background: #ffffff;
+      padding: 20px 30px;
+      border-radius: 10px;
+      font-family: 'Courier New', Courier, monospace;
+      color: #2c3e50;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-left: 6px solid #3498db;
+      text-align: left;
+      max-width: 90%;
+    ">
+      <div style="font-weight: bold; margin-bottom: 8px; color: #2980b9;">
+        To use your certificate with SSH:
+      </div>
+      <code style="font-size: 15px; background: #f4f4f4; display: inline-block; padding: 6px 10px; border-radius: 4px;">
+        ssh -i yourcertificate.pub role@ip
+      </code>
+    </div>
+  </div>
+  
+    
   <script>
     function parseJwt(token) {
       try {
