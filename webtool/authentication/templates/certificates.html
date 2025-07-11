@@ -141,10 +141,15 @@
           certBlock.className = "certificate";
 
           const issuedDate = new Date(cert.issued_at).toLocaleString();
-          const validDate = new Date(cert.valid_until).toLocaleString();
-          const certText = cert.cert.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          const rawCertText = cert.cert;
-          const safeFilename = `certificate-${issuedDate.replace(/[/,: ]/g, "_")}.pub`;
+const validDate = new Date(cert.valid_until).toLocaleString();
+const certText = cert.cert.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const rawCertText = cert.cert;
+
+const role = cert.group || "ssh_certificate";
+const issuedAtSanitized = issuedDate.replace(/[/,: ]/g, "_");
+const safeRole = role.replace(/[^a-zA-Z0-9_-]/g, "_");
+const safeFilename = `${safeRole}.pub`;
+
 
           certBlock.innerHTML = `
             <div class="certificate-label">Issued At:</div> ${issuedDate}<br>
@@ -152,7 +157,7 @@
             <div class="certificate-label">Group:</div> ${cert.group}<br>
             <div class="certificate-label">Certificate:</div>
             <pre>${certText}</pre>
-            <button class="download-button" onclick="downloadCertificate(\`${rawCertText}\`, '${safeFilename}')">⬇ Download Certificate</button>
+            <button class="download-button" onclick="downloadCertificate(\`${rawCertText}\`')">⬇ Download Certificate</button>
           `;
 
           container.appendChild(certBlock);
@@ -194,18 +199,19 @@
       });
     });
 
-    // Function to download a certificate as a file
     function downloadCertificate(content, filename) {
-      const blob = new Blob([content], { type: "application/x-pem-file" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
+  const blob = new Blob([content], { type: "application/x-pem-file" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || "ssh_certificate.pub";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
   </script>
 
 </body>
