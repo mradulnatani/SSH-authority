@@ -1,14 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>Login</title>
-</head>
-<body>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    * {
-      box-sizing: border-box;
-    }
-  
+    * { box-sizing: border-box; }
     body {
       font-family: 'Inter', sans-serif;
       background: #0f172a;
@@ -20,13 +17,11 @@
       align-items: center;
       min-height: 100vh;
     }
-  
     h2 {
       color: #60a5fa;
       font-size: 28px;
       margin-bottom: 25px;
     }
-  
     form {
       background: rgba(30, 41, 59, 0.85);
       padding: 35px 30px;
@@ -34,19 +29,14 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
       max-width: 420px;
       width: 100%;
-      animation: fadeIn 0.6s ease-in-out;
     }
-  
     label {
       font-weight: 500;
       display: block;
       margin-bottom: 6px;
       color: #cbd5e1;
     }
-  
-    input[type="text"],
-    input[type="email"],
-    input[type="password"] {
+    input, select {
       width: 100%;
       padding: 12px 14px;
       margin-bottom: 18px;
@@ -55,15 +45,12 @@
       background: #1e293b;
       color: #f1f5f9;
       font-size: 14px;
-      transition: border 0.3s, box-shadow 0.3s;
     }
-  
-    input:focus {
+    input:focus, select:focus {
       border-color: #3b82f6;
       outline: none;
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
     }
-  
     button[type="submit"] {
       width: 100%;
       background-color: #3b82f6;
@@ -74,88 +61,126 @@
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: background-color 0.3s ease;
     }
-  
     button[type="submit"]:hover {
       background-color: #2563eb;
     }
-  
     #response {
       margin-top: 20px;
+      padding: 12px;
+      border-radius: 8px;
       text-align: center;
       font-weight: 500;
-      color: #f87171;
     }
-  
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    .error {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #f87171;
     }
-  
     @media (max-width: 500px) {
-      form {
-        padding: 25px 20px;
-      }
+      form { padding: 25px 20px; }
     }
   </style>
-    
-  <h2>Login</h2>
-  <form id="loginForm">
-    <label>Username:</label><br>
-    <input type="text" id="username" required><br><br>
+</head>
+<body>
 
-    <label>Email:</label><br>
-    <input type="email" id="email" required><br><br>
+<h2>Login</h2>
 
-    <label>Password:</label><br>
-    <input type="password" id="password" required><br><br>
+<form id="loginForm">
+  <label for="role">Login as:</label>
+  <select id="role">
+    <option value="user" selected>User</option>
+    <option value="admin">Admin</option>
+  </select>
 
-    <label>Group:</label><br>
-    <input type="text" id="group" required><br><br>
+  <label>Email:</label>
+  <input type="email" id="email" required>
 
-    <button type="submit">Login</button>
-  </form>
+  <label>Password:</label>
+  <input type="password" id="password" required>
 
-  <p id="response"></p>
+  <div id="groupContainer">
+    <label for="group">Group:</label>
+    <select id="group">
+      <option value="">Loading...</option>
+    </select>
+  </div>
 
-  <script>
-    document.getElementById("loginForm").addEventListener("submit", function (e) {
-      e.preventDefault();
+  <button type="submit">Login</button>
+</form>
 
-      const username = document.getElementById("username").value;
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      const group = document.getElementById("group").value;
+<p id="response"></p>
 
-      fetch("/api/token/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ username, email, password, group })
+<script>
+  const roleSelect = document.getElementById("role");
+  const groupSelect = document.getElementById("group");
+  const groupContainer = document.getElementById("groupContainer");
+  const responseEl = document.getElementById("response");
+
+  function loadGroups() {
+    fetch("/api/groups/")
+      .then(res => res.json())
+      .then(groups => {
+        groupSelect.innerHTML = '<option value="">Select a group</option>';
+        groups.filter(g => g !== "ubuntu").forEach(group => {
+          const opt = document.createElement("option");
+          opt.value = group;
+          opt.textContent = group;
+          groupSelect.appendChild(opt);
+        });
       })
-      .then(response => response.json().then(data => ({ status: response.status, body: data })))
-      .then(({ status, body }) => {
-        if (status === 200) {
-          localStorage.setItem("access", body.access);
-          localStorage.setItem("refresh", body.refresh);
-
-          window.location.href = "/dashboard/";  
-        } else {
-          document.getElementById("response").innerText = "Login failed: " + JSON.stringify(body);
-        }
-      })
-      .catch(error => {
-        document.getElementById("response").innerText = "Error: " + error;
+      .catch(err => {
+        groupSelect.innerHTML = '<option value="">Error loading groups</option>';
       });
+  }
+
+  roleSelect.addEventListener("change", () => {
+    const isAdmin = roleSelect.value === "admin";
+    groupContainer.style.display = isAdmin ? "none" : "block";
+    if (isAdmin) groupSelect.removeAttribute("required");
+    else groupSelect.setAttribute("required", "required");
+  });
+
+  roleSelect.dispatchEvent(new Event("change"));
+  loadGroups();
+
+  document.getElementById("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    responseEl.className = "";
+    responseEl.textContent = "";
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const group = roleSelect.value === "admin" ? "ubuntu" : groupSelect.value;
+
+    if (!email || !password || (roleSelect.value === "user" && !group)) {
+      responseEl.textContent = "Please fill out all required fields.";
+      responseEl.className = "error";
+      return;
+    }
+
+    fetch("/api/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, group })
+    })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ status, data }) => {
+      if (status === 200) {
+        localStorage.setItem("access", data.access);
+        localStorage.setItem("refresh", data.refresh);
+        window.location.href = "/dashboard/";
+      } else {
+        responseEl.textContent = data.detail || JSON.stringify(data);
+        responseEl.className = "error";
+      }
+    })
+    .catch(err => {
+      responseEl.textContent = "Login failed: " + err;
+      responseEl.className = "error";
     });
-  </script>
+  });
+</script>
+
 </body>
 </html>

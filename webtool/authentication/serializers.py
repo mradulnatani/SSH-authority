@@ -51,7 +51,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    group = serializers.CharField(write_only=True)  
+    group = serializers.CharField(write_only=True)  # Accept group by name
 
     class Meta:
         model = CustomUser
@@ -61,18 +61,35 @@ class UserSerializer(serializers.ModelSerializer):
         email = validated_data['email']
         username = validated_data['username']
         password = validated_data['password']
-        group_name = validated_data['group']  
+        group_name = validated_data['group']
 
         try:
+            # Get group using 'server_tags' field as per your model logic
             group = Group.objects.get(server_tags=group_name)
         except Group.DoesNotExist:
-            raise serializers.ValidationError({"group": "Group not found with the given name."})
+            raise serializers.ValidationError({
+                "group": "Group not found with the given name."
+            })
 
+        # Restriction: only one user allowed in 'ubuntu' group
+        if group.name == 'ubuntu':
+            if CustomUser.objects.filter(group__name='ubuntu').exists():
+                raise serializers.ValidationError({
+                    "group": "Only one user can belong to the ubuntu group (admin)."
+                })
+
+        # Create the user
         user = CustomUser(email=email, username=username)
         user.set_password(password)
         user.group = group
+
+        # Mark as admin if group is 'ubuntu'
+        if group.name == 'ubuntu':
+            user.is_admin_user = True
+
         user.save()
 
+        # Add to many-to-many custom_groups
         user.custom_groups.add(group)
 
         return user

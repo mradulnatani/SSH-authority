@@ -28,16 +28,42 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from authentication.models import ActivityLog  
-
+from .models import CustomUser
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@18.207.248.141"
+command = f"ssh -i {pem_path} ubuntu@54.172.42.114"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
   
+class AdminRegisterView(APIView):
+    permission_classes = [AllowAny]
 
+    def post(self, request):
+        if CustomUser.objects.filter(group__name='ubuntu').exists():
+            return Response({'error': 'Admin user already exists.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Force group = ubuntu regardless of what the request sends
+        data = request.data.copy()
+        data['group'] = 'ubuntu'
+
+        serializer = UserSerializer(data=data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        # Force the group in request to be "ubuntu"
+        request.data._mutable = True
+        request.data["group"] = "ubuntu"
+        request.data._mutable = False
+        return super().post(request, *args, **kwargs)
 
 class CustomTokenRefreshView(TokenRefreshView):
     pass
@@ -189,7 +215,7 @@ def sign_key_on_remote_ca(request):
                 'error': 'You already have a valid certificate. You can request a new one after it expires.'
             }, status=status.HTTP_403_FORBIDDEN)
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "18.207.248.141"
+        REMOTE_HOST = "54.172.42.114"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 

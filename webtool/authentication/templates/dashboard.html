@@ -232,7 +232,6 @@
       const total = certs.length;
 
       document.getElementById("certCount").textContent = `Certificates Issued: ${total}`;
-
       if (total > 0) {
         const latest = certs[0];
         const issued = new Date(latest.issued_at);
@@ -348,7 +347,7 @@ document.getElementById("certContainer").style.display = "block";
    
     function downloadCert(content) {
   const role = payload.group || "ssh_certificate";
-  const safeRole = role.replace(/[^a-zA-Z0-9_-]/g, "_"); // sanitize filename
+  const safeRole = role.replace(/[^a-zA-Z0-9_-]/g, "_"); 
   const blob = new Blob([content], { type: "application/x-pem-file" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
