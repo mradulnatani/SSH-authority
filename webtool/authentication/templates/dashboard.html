@@ -255,8 +255,17 @@
         const timeLeft = expires - now;
         const percent = Math.max(0, Math.min(100, (timeLeft / totalDuration) * 100));
 
-        document.getElementById("expiryTime").textContent =
-          timeLeft <= 0 ? "Expired" : `${Math.round(percent)}% time remaining`;
+        if (timeLeft <= 0) {
+  document.getElementById("expiryTime").textContent = "Expired";
+} else {
+  const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+  const hoursLeft = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+  const minutesLeft = Math.floor((timeLeft / (1000 * 60)) % 60);
+
+  document.getElementById("expiryTime").textContent =
+    `${daysLeft}d ${hoursLeft}h ${minutesLeft}m remaining`;
+}
+
 
         const bar = document.getElementById("expiryProgress");
         bar.style.width = percent + "%";
@@ -295,7 +304,7 @@
       if (!pubKey) return alert("Public key is required!");
 
       if (!isValidSSHKey(pubKey)) {
-        return alert("Invalid SSH public key format. It must begin with ssh-rsa, ssh-ed25519, or ecdsa-* and be properly encoded.");
+        return alert("Invalid SSH public key format.");
       }
 
       document.getElementById("loadingMessage").style.display = "block";
