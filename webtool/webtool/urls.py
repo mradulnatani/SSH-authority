@@ -11,6 +11,10 @@ from django.views.generic import TemplateView
 from authentication.views import get_all_certs
 from authentication.views import logout_view
 from authentication.views import get_groups
+from authentication.views import (
+    AdminRegisterView,
+    AdminTokenObtainPairView,
+)
 
 urlpatterns = [
     path('', TemplateView.as_view(template_name="index.html")),  
@@ -25,7 +29,8 @@ urlpatterns = [
     path("api/certificates/", get_all_certs, name="certs"),
     path("api/logout/", logout_view, name="logout"),
     path("api/groups/", get_groups, name="get-groups"),
-
+    path("api/admin/register/", AdminRegisterView.as_view(), name="admin-register"),
+    path("api/admin/login/", AdminTokenObtainPairView.as_view(), name="admin-login"),
 
 
 

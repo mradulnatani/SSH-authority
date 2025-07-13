@@ -111,13 +111,22 @@
 
     #error {
       margin-top: 1rem;
-      background-color: var(--error-bg);
-      color: var(--error-text);
-      border: 1px solid var(--error-border);
       padding: 0.75rem;
       border-radius: 0.5rem;
       text-align: center;
       font-weight: 500;
+    }
+
+    .error {
+      background-color: var(--error-bg);
+      color: var(--error-text);
+      border: 1px solid var(--error-border);
+    }
+
+    .success {
+      background-color: #dcfce7;
+      color: #15803d;
+      border: 1px solid #4ade80;
     }
 
     @keyframes fadeIn {
@@ -135,6 +144,12 @@
   <form id="registerForm">
     <h2>User Registration</h2>
 
+    <label for="roleSelect">Register As:</label>
+    <select id="roleSelect">
+      <option value="user" selected>User</option>
+      <option value="admin">Admin</option>
+    </select>
+
     <label for="email">Email:</label>
     <input type="email" id="email" required>
 
@@ -144,10 +159,12 @@
     <label for="password">Password:</label>
     <input type="password" id="password" required>
 
-    <label for="group">Group Name:</label>
-    <select id="group" required>
-      <option value="">Loading groups...</option>
-    </select>
+    <div id="groupContainer">
+      <label for="group">Group Name:</label>
+      <select id="group">
+        <option value="">Loading groups...</option>
+      </select>
+    </div>
 
     <button type="submit">Register</button>
 
@@ -156,65 +173,86 @@
   </form>
 
   <script>
-    // Populate group dropdown from backend
-    fetch("/api/groups/")
-      .then(response => response.json())
-      .then(groups => {
-        const groupSelect = document.getElementById("group");
-        groupSelect.innerHTML = '<option value="">Select a group</option>';
-        groups.forEach(group => {
-          const option = document.createElement("option");
-          option.value = group;
-          option.textContent = group;
-          groupSelect.appendChild(option);
-        });
-      })
-      .catch(err => {
-        document.getElementById("group").innerHTML = '<option value="">Failed to load groups</option>';
-        console.error("Group load error:", err);
-      });
+    const roleSelect = document.getElementById("roleSelect");
+    const groupSelect = document.getElementById("group");
+    const groupContainer = document.getElementById("groupContainer");
+    const errorEl = document.getElementById("error");
 
-    // Handle registration
+    function loadGroups() {
+      fetch("/api/groups/")
+        .then(response => response.json())
+        .then(groups => {
+          groupSelect.innerHTML = '<option value="">Select a group</option>';
+          groups.filter(g => g !== "ubuntu").forEach(group => {
+            const option = document.createElement("option");
+            option.value = group;
+            option.textContent = group;
+            groupSelect.appendChild(option);
+          });
+        })
+        .catch(err => {
+          groupSelect.innerHTML = '<option value="">Failed to load groups</option>';
+        });
+    }
+
+    roleSelect.addEventListener("change", () => {
+      const isAdmin = roleSelect.value === "admin";
+      groupContainer.style.display = isAdmin ? "none" : "block";
+      if (isAdmin) groupSelect.removeAttribute("required");
+      else groupSelect.setAttribute("required", "required");
+    });
+
+    roleSelect.dispatchEvent(new Event("change"));
+    loadGroups();
+
     document.getElementById("registerForm").addEventListener("submit", function (e) {
       e.preventDefault();
+      errorEl.className = "";
+      errorEl.textContent = "";
 
       const email = document.getElementById("email").value.trim();
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
-      const group = document.getElementById("group").value;
-      const resultEl = document.getElementById("error");
+      const role = roleSelect.value;
+      const group = role === "admin" ? "ubuntu" : groupSelect.value;
 
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const usernamePattern = /^[A-Za-z_]+$/;
 
       if (!emailPattern.test(email)) {
-        resultEl.textContent = "Please enter a valid email address.";
+        errorEl.textContent = "Please enter a valid email address.";
+        errorEl.className = "error";
         return;
       }
 
       if (!usernamePattern.test(username)) {
-        resultEl.textContent = "Username should contain only letters and underscores.";
+        errorEl.textContent = "Username should contain only letters and underscores.";
+        errorEl.className = "error";
         return;
       }
 
-      fetch("/api/register/", {
+      const payload = { email, username, password, group };
+      const endpoint = role === "admin" ? "/api/admin/register/" : "/api/register/";
+
+      fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password, group })
+        body: JSON.stringify(payload)
       })
       .then(res => res.json().then(data => ({ status: res.status, data })))
       .then(({ status, data }) => {
         if (status === 201) {
-          resultEl.style.color = "green";
-          resultEl.textContent = "Registration successful! Redirecting...";
+          errorEl.textContent = "Registration successful! Redirecting...";
+          errorEl.className = "success";
           setTimeout(() => window.location.href = "/login/", 1500);
         } else {
-          resultEl.style.color = "";
-          resultEl.textContent = "Registration failed: " + (data.detail || JSON.stringify(data));
+          errorEl.textContent = data.detail || JSON.stringify(data);
+          errorEl.className = "error";
         }
       })
       .catch(error => {
-        resultEl.textContent = "Error: " + error;
+        errorEl.textContent = "Error: " + error;
+        errorEl.className = "error";
       });
     });
   </script>
