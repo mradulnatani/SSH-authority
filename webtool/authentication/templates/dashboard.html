@@ -176,7 +176,12 @@
         To use your certificate with SSH:
       </div>
       <code style="font-size: 15px; background: #f4f4f4; display: inline-block; padding: 6px 10px; border-radius: 4px;">
-        ssh -i yourcertificate.pub role@ip
+       1. Submit the public key, from the .ssh file inside your system <br/>
+       2. Download the certificate <br/>
+       3. Now open the terminal on your local system, inside the ~/Downloads directory give the downloaded certificate file appropriate permissions <br/>
+      <b> > sudo chmod 600 your_certificate_file.pub </b>  <br/>
+       4. Now you can ssh in your respected server <br/>
+      <b>  > ssh -i yourcertificate.pub role@ip</b>
       </code>
     </div>
   </div>
