@@ -176,7 +176,12 @@
         To use your certificate with SSH:
       </div>
       <code style="font-size: 15px; background: #f4f4f4; display: inline-block; padding: 6px 10px; border-radius: 4px;">
-        ssh -i yourcertificate.pub role@ip
+       1. Submit the public key, from the .ssh file inside your system <br/>
+       2. Download the certificate <br/>
+       3. Now open the terminal on your local system, inside the ~/Downloads directory give the downloaded certificate file appropriate permissions <br/>
+      <b> > sudo chmod 600 your_certificate_file.pub </b>  <br/>
+       4. Now you can ssh in your respected server <br/>
+      <b>  > ssh -i yourcertificate.pub role@ip</b>
       </code>
     </div>
   </div>
@@ -250,8 +255,17 @@
         const timeLeft = expires - now;
         const percent = Math.max(0, Math.min(100, (timeLeft / totalDuration) * 100));
 
-        document.getElementById("expiryTime").textContent =
-          timeLeft <= 0 ? "Expired" : `${Math.round(percent)}% time remaining`;
+        if (timeLeft <= 0) {
+  document.getElementById("expiryTime").textContent = "Expired";
+} else {
+  const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+  const hoursLeft = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+  const minutesLeft = Math.floor((timeLeft / (1000 * 60)) % 60);
+
+  document.getElementById("expiryTime").textContent =
+    `${daysLeft}d ${hoursLeft}h ${minutesLeft}m remaining`;
+}
+
 
         const bar = document.getElementById("expiryProgress");
         bar.style.width = percent + "%";
@@ -290,7 +304,7 @@
       if (!pubKey) return alert("Public key is required!");
 
       if (!isValidSSHKey(pubKey)) {
-        return alert("Invalid SSH public key format. It must begin with ssh-rsa, ssh-ed25519, or ecdsa-* and be properly encoded.");
+        return alert("Invalid SSH public key format.");
       }
 
       document.getElementById("loadingMessage").style.display = "block";
