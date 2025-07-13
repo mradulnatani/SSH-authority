@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .models import Group
 from .models import PublicKey
+from .models import GroupIP
 # import docker
 # import requests
 from django.http import JsonResponse, HttpResponse
@@ -84,24 +85,54 @@ class RegisterView(APIView):
 def receive_tags(request):
     print("Raw request data:", request.data)
     tags = request.data.get('tags', [])
-    
-    if not isinstance(tags, list):
-        return Response({"error": "Invalid format for tags"}, status=status.HTTP_400_BAD_REQUEST)
+    public_ip = request.data.get('public_ip')
+
+    if not isinstance(tags, list) or not public_ip:
+        return Response({"error": "Invalid format for tags or missing IP"}, status=status.HTTP_400_BAD_REQUEST)
 
     created_groups = []
 
     for tag in tags:
+        tag = tag.strip()
+        if not tag:
+            continue
+
         group, created = Group.objects.get_or_create(
-            name=tag, defaults={'server_tags': tag}
+            name=tag,
+            defaults={'server_tags': tag}
         )
         if created:
             created_groups.append(group.name)
 
+        # Save each tag-IP mapping
+        GroupIP.objects.get_or_create(
+            group_name=tag,
+            public_ip=public_ip
+        )
+
     return Response({
-        "message": "Tags processed successfully",
+        "message": "Tags and IP processed successfully",
         "created_groups": created_groups,
-        "received_tags": tags
+        "received_tags": tags,
+        "saved_ip": public_ip
     }, status=status.HTTP_200_OK)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_group_ips(request):
+    user_group = getattr(request.user, 'group', None)
+    if not user_group:
+        return Response({"error": "User group not found"}, status=400)
+
+    group_ips = GroupIP.objects.filter(group_name=user_group.name).values_list('public_ip', flat=True)
+
+    return Response({
+        "group": user_group.name,
+        "ips": list(group_ips)
+    })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -368,3 +399,17 @@ def get_groups(request):
 #     )
 
 #     return JsonResponse({"history": list(data)})
+
+# authentication/views.py
+from authentication.models import GroupIP
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_group_ips(request):
+    group = request.user.group  # or request.user.custom_group.name if your field differs
+    ips = GroupIP.objects.filter(group_name=group).values_list('public_ip', flat=True)
+    return Response({"ips": list(ips)})
+

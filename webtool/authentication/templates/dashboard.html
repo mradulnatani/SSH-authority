@@ -373,6 +373,21 @@ document.getElementById("certContainer").style.display = "block";
   URL.revokeObjectURL(url);
 }
 
+// Fetch and display accessible IPs based on group
+fetch("/api/group-ips/", { headers })
+  .then(res => res.json())
+  .then(data => {
+    const ips = data.ips || [];
+    const container = document.createElement("div");
+    container.className = "metric";
+    container.innerHTML = `
+      <strong>Accessible Server IPs:</strong><br>
+      ${ips.map(ip => `<code style="display:block; margin-top: 5px;">${ip}</code>`).join('')}
+    `;
+    document.querySelector(".info-metrics").appendChild(container);
+  })
+  .catch(err => console.error("Failed to load group IPs:", err));
+
 
   </script>
 </body>
