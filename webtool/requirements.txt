@@ -26,7 +26,9 @@ MarkupSafe==3.0.2
 msgpack==1.1.1
 platformdirs==4.3.8
 psutil==7.0.0
+psycopg2-binary==2.9.10
 PyJWT==2.9.0
+python-dotenv==1.1.1
 python-engineio==4.12.2
 python-socketio==5.13.0
 pyzmq==27.0.0
