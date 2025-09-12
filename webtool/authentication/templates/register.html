@@ -151,10 +151,11 @@
     </select>
 
     <label for="email">Email:</label>
-    <input type="email" id="email" required>
-
+    <input type="email" id="email" maxlength="50" required>
+    
     <label for="username">Username:</label>
-    <input type="text" id="username" required>
+    <input type="text" id="username" maxlength="10" required>
+    
 
     <label for="password">Password:</label>
     <input type="password" id="password" required>
@@ -219,6 +220,18 @@
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const usernamePattern = /^[A-Za-z_]+$/;
 
+      if (email.length > 40) {
+  errorEl.textContent = "Email must be no longer than 20 characters.";
+  errorEl.className = "error";
+  return;
+}
+
+if (username.length > 10) {
+  errorEl.textContent = "Username must be no longer than 10 characters.";
+  errorEl.className = "error";
+  return;
+}
+
       if (!emailPattern.test(email)) {
         errorEl.textContent = "Please enter a valid email address.";
         errorEl.className = "error";
@@ -231,13 +244,23 @@
         return;
       }
 
-      const payload = { email, username, password, group };
-      const endpoint = role === "admin" ? "/api/admin/register/" : "/api/register/";
+      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+
+if (!passwordPattern.test(password)) {
+  errorEl.textContent =
+    "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
+  errorEl.className = "error";
+  return;
+}
+
+const payload = { email, username, password, group };
+const endpoint = role === "admin" ? "/api/admin/register/" : "/api/register/";
+
 
       fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload) 
       })
       .then(res => res.json().then(data => ({ status: res.status, data })))
       .then(({ status, data }) => {

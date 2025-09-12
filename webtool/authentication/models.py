@@ -21,7 +21,6 @@ class CustomUser(AbstractUser):
     def clean(self):
         super().clean()
         if self.group.name == 'ubuntu':
-            # Check: only one user can belong to 'ubuntu'
             other_users = CustomUser.objects.filter(group__name='ubuntu').exclude(pk=self.pk)
             if other_users.exists():
                 raise ValidationError("Only one user can be assigned to the 'ubuntu' group.")
@@ -77,3 +76,11 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.event}"
+    
+
+class GroupIP(models.Model):
+    group_name = models.CharField(max_length=100)
+    public_ip = models.GenericIPAddressField()
+
+    def __str__(self):
+        return f"{self.group_name} → {self.public_ip}"
