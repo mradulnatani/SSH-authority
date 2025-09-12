@@ -12,6 +12,9 @@ from rest_framework import status
 from .models import Group
 from .models import PublicKey
 from .models import GroupIP
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view
+from django.utils.decorators import method_decorator
 # import docker
 # import requests
 from django.http import JsonResponse, HttpResponse
@@ -32,12 +35,13 @@ from authentication.models import ActivityLog
 from .models import CustomUser
 
 pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@54.172.42.114"
+command = f"ssh -i {pem_path} ubuntu@54.159.193.62"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
   
+@method_decorator(csrf_exempt, name='dispatch')
 class AdminRegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -69,6 +73,7 @@ class AdminTokenObtainPairView(TokenObtainPairView):
 class CustomTokenRefreshView(TokenRefreshView):
     pass
 
+@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -81,6 +86,7 @@ class RegisterView(APIView):
                 return Response(json, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@csrf_exempt
 @api_view(['POST'])
 def receive_tags(request):
     print("Raw request data:", request.data)
@@ -104,7 +110,6 @@ def receive_tags(request):
         if created:
             created_groups.append(group.name)
 
-        # Save each tag-IP mapping
         GroupIP.objects.get_or_create(
             group_name=tag,
             public_ip=public_ip
@@ -119,7 +124,7 @@ def receive_tags(request):
 
 
 
-
+@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_group_ips(request):
@@ -134,6 +139,7 @@ def get_group_ips(request):
         "ips": list(group_ips)
     })
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def pub_key(request):
@@ -150,7 +156,7 @@ def pub_key(request):
     return Response({'message': 'Public key uploaded successfully.'}, status=status.HTTP_201_CREATED)
 
 
-
+@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def keysign(request):
@@ -218,7 +224,7 @@ def keysign(request):
 
     # except subprocess.CalledProcessError as e:
     #     return Response({'error': 'Signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+@csrf_exempt  
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_user(request):
@@ -246,7 +252,7 @@ def sign_key_on_remote_ca(request):
                 'error': 'You already have a valid certificate. You can request a new one after it expires.'
             }, status=status.HTTP_403_FORBIDDEN)
         REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "54.172.42.114"
+        REMOTE_HOST = "54.159.193.62"
         REMOTE_CONTAINER = "certificate-authority"
         SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
 
@@ -324,6 +330,7 @@ def sign_key_on_remote_ca(request):
     except subprocess.CalledProcessError as e:
         return Response({'error': 'Remote signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@csrf_exempt
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_all_certs(request):
@@ -339,7 +346,7 @@ def get_all_certs(request):
         })
     return JsonResponse({"certificates": data})
 
-
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
@@ -354,6 +361,8 @@ def logout_view(request):
 def log_activity(user, action, metadata=None):
     ActivityLog.objects.create(user=user, action=action, metadata=metadata or {})
 
+
+@csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def revoke_cert(request):
@@ -401,15 +410,13 @@ def get_groups(request):
 #     return JsonResponse({"history": list(data)})
 
 # authentication/views.py
-from authentication.models import GroupIP
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_group_ips(request):
-    group = request.user.group  # or request.user.custom_group.name if your field differs
-    ips = GroupIP.objects.filter(group_name=group).values_list('public_ip', flat=True)
-    return Response({"ips": list(ips)})
+
+# @csrf_exempt
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_group_ips(request):
+#     group = request.user.group  # or request.user.custom_group.name if your field differs
+#     ips = GroupIP.objects.filter(group_name=group).values_list('public_ip', flat=True)
+#     return Response({"ips": list(ips)})
 
