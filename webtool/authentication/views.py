@@ -15,8 +15,6 @@ from .models import GroupIP
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from django.utils.decorators import method_decorator
-# import docker
-# import requests
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import PublicKey
@@ -34,8 +32,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from authentication.models import ActivityLog  
 from .models import CustomUser
 
-pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-command = f"ssh -i {pem_path} ubuntu@54.159.193.62"
+#pem_path = os.path.expanduser("~/Downloads/formradul.pem")
+#command = f"ssh -i {pem_path} ubuntu@54.159.193.62"
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -238,7 +236,7 @@ def get_user(request):
         "date_joined": user.date_joined.strftime("%Y-%m-%d %H:%M:%S")
     })
 
-
+""""
 def sign_key_on_remote_ca(request):
     try:
          # Check if user already has a valid (non-expired) certificate
@@ -329,6 +327,91 @@ def sign_key_on_remote_ca(request):
 
     except subprocess.CalledProcessError as e:
         return Response({'error': 'Remote signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+"""
+def sign_key_on_remote_ca(request):
+    try:
+        # Check if user already has a valid (non-expired) certificate
+        existing_cert = Certificate.objects.filter(
+            user=request.user,
+            valid_until__gt=timezone.now()
+        ).first()
+        if existing_cert:
+            return Response({
+                'error': 'You already have a valid certificate. You can request a new one after it expires.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Docker container info
+        CONTAINER_NAME = "certificate-authority"
+
+        # Fetch the user's latest unsigned public key
+        public_key_obj = PublicKey.objects.filter(user=request.user, signed=False).latest('uploaded_at')
+        public_key = public_key_obj.key_data
+
+        # Get user's group and roles
+        user_groups = request.user.custom_groups.all()
+        if not user_groups.exists():
+            return Response({'error': 'No group associated with this user'}, status=status.HTTP_403_FORBIDDEN)
+        group = user_groups.first()
+        roles = list(user_groups.values_list('name', flat=True))
+        roles_str = ",".join(roles)
+        username = request.user.username
+
+        # Save public key to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
+            f.write(public_key)
+            local_pub_path = f.name
+
+        # Define paths inside the container
+        container_pub_path = f"/tmp/{os.path.basename(local_pub_path)}"
+        container_cert_path = f"{container_pub_path}-cert.pub"
+        local_cert_path = f"{local_pub_path}-cert.pub"
+
+        # Step 1: Copy public key into the Docker container
+        subprocess.run([
+            "docker", "cp", local_pub_path, f"{CONTAINER_NAME}:{container_pub_path}"
+        ], check=True)
+
+        # Step 2: Run the signing script inside the container
+        subprocess.run([
+            "docker", "exec", CONTAINER_NAME, "bash", "-c",
+            f"/usr/local/bin/sign.sh {container_pub_path} {username} \"{roles_str}\""
+        ], check=True)
+
+        # Step 3: Copy the signed certificate back to host
+        subprocess.run([
+            "docker", "cp", f"{CONTAINER_NAME}:{container_cert_path}", local_cert_path
+        ], check=True)
+
+        # Step 4: Read signed certificate and clean up temp files
+        with open(local_cert_path) as f:
+            signed_cert = f.read()
+        os.remove(local_pub_path)
+        os.remove(local_cert_path)
+
+        # Step 5: Mark public key as signed
+        public_key_obj.signed = True
+        public_key_obj.save()
+
+        # Step 6: Save certificate metadata in DB
+        issued_at = timezone.now()
+        valid_until = issued_at + timedelta(days=7)
+        Certificate.objects.create(
+            user=request.user,
+            public_key=public_key_obj,
+            group=group,
+            issued_at=issued_at,
+            valid_until=valid_until,
+            cert_data=signed_cert
+        )
+
+        # Return signed certificate to the user
+        return HttpResponse(signed_cert, content_type="text/plain")
+
+    except PublicKey.DoesNotExist:
+        return Response({'error': 'No unsigned public key found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
+    except subprocess.CalledProcessError as e:
+        return Response({'error': 'Docker container signing failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
 @api_view(["GET"])
@@ -339,7 +422,7 @@ def get_all_certs(request):
     data = []
     for cert in certs:
         data.append({
-            "cert": cert.cert_data,  # <--- corrected from content to cert_data
+            "cert": cert.cert_data,  
             "issued_at": cert.issued_at.isoformat(),
             "valid_until": cert.valid_until.isoformat(),
             "group": cert.group.name if cert.group else "N/A"
