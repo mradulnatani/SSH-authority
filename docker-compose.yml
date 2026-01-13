@@ -68,28 +68,37 @@ services:
     restart: on-failure
     volumes:
       - ./ssh-ca:/ssh-ca
-      - ./sign.sh:/usr/local/bin/sign.sh/
+      - ./sign.sh:/usr/local/bin/sign.sh
     command: >
       bash -c "
-      chmod +x /usr/local/bin/sign.sh &&
-      if [ ! -f /ssh-ca/id_rsa ]; then
-        ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key';
-      fi &&
-      if [ ! -f /ssh-ca/id_rsa.pub ]; then
-        ssh-keygen -y -f /ssh-ca/id_rsa > /ssh-ca/id_rsa.pub;
-      fi &&
-      tail -f /dev/null"
+        set -e
+        mkdir -p /ssh-ca
 
+        if [ -d /ssh-ca/id_rsa.pub ]; then
+          rm -rf /ssh-ca/id_rsa.pub
+        fi
+
+        if [ ! -f /ssh-ca/id_rsa ]; then
+          ssh-keygen -t rsa -b 4096 -f /ssh-ca/id_rsa -N '' -C 'ca-key'
+        fi
+
+        if [ ! -f /ssh-ca/id_rsa.pub ]; then
+          ssh-keygen -y -f /ssh-ca/id_rsa > /ssh-ca/id_rsa.pub
+        fi
+
+        chmod 600 /ssh-ca/id_rsa
+        chmod 644 /ssh-ca/id_rsa.pub
+        chmod +x /usr/local/bin/sign.sh
+
+        tail -f /dev/null
+      "
     networks:
       - config-mgt
-
 
   consul-lb:
     image: haproxy:alpine
     container_name: consul-lb
-    hostname: consul_lb
-    networks:
-      - config-mgt
+    hostname: consul-lb
     ports:
       - "18500:8500"
     volumes:
@@ -99,22 +108,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-
+    networks:
+      - config-mgt
 
   consul-sync:
     image: python:3.11-slim
     working_dir: /app
     volumes:
       - ./consul_sync.py:/app/consul_sync.py:ro
-      - ./ssh-ca/id_rsa.pub:/app/id_rsa.pub:ro  
+      - ./ssh-ca/id_rsa.pub:/app/id_rsa.pub:ro
     command: >
-          sh -c "pip install requests && echo '>>> Running consul_sync.py' && python consul_sync.py && tail -f /dev/null"
+      sh -c "pip install requests &&
+             echo '>>> Running consul_sync.py' &&
+             python consul_sync.py &&
+             tail -f /dev/null"
     networks:
       - config-mgt
 
-
 networks:
- config-mgt:
+  config-mgt:
     driver: bridge
-
 

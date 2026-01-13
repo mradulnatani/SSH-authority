@@ -1,69 +1,138 @@
 import os
 import time
 import logging
-import requests
 import argparse
+import requests
+import sys
+
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Watch a file and upload its contents to Consul KV store.")
-    parser.add_argument("--file", default="/app/id_rsa.pub", help="Path of file to watch")
-    parser.add_argument("--consul-url", default="http://consul-lb:8500", help="Consul server URL")
-    parser.add_argument("--kv-key", default="ca/pub-key/id_rsa.pub", help="Consul KV key to store the file content")
-    parser.add_argument("--token", default=None, help="Consul ACL token")
-    parser.add_argument("--interval", type=int, default=2, help="Polling interval in seconds")
+    parser = argparse.ArgumentParser(
+        description="Watch a file and sync its contents to Consul KV"
+    )
+    parser.add_argument(
+        "--file",
+        required=True,
+        help="Absolute path of the file to watch (must exist)",
+    )
+    parser.add_argument(
+        "--consul-url",
+        default="http://localhost:8500",
+        help="Consul HTTP address (default: http://localhost:8500)",
+    )
+    parser.add_argument(
+        "--kv-key",
+        required=True,
+        help="Consul KV key where file content will be stored",
+    )
+    parser.add_argument(
+        "--token",
+        required=True,
+        help="Consul ACL token (SecretID)",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=2,
+        help="Polling interval in seconds",
+    )
     return parser.parse_args()
 
-def read_file_content(path):
-    try:
-        with open(path, "r") as f:
-            return f.read()
-    except Exception as e:
-        logging.error(f"Failed to read file {path}: {e}")
-        return None
 
-def upload_to_consul(url, key, value, token):
-    full_url = f"{url}/v1/kv/{key}"
-    headers = {"X-Consul-Token": token} if token else {}
+def validate_file(path):
+    if not os.path.isabs(path):
+        logging.error("File path must be absolute: %s", path)
+        sys.exit(1)
+
+    if not os.path.isfile(path):
+        logging.error("File does not exist: %s", path)
+        sys.exit(1)
+
+
+def validate_consul(consul_url, token):
     try:
-        response = requests.put(full_url, data=value.encode("utf-8"), headers=headers)
-        if response.status_code == 200:
-            logging.info(f"Uploaded to Consul KV: {key}")
-        else:
-            logging.error(f"Failed to upload to Consul KV: status {response.status_code}, response {response.text}")
+        r = requests.get(
+            f"{consul_url}/v1/status/leader",
+            headers={"X-Consul-Token": token},
+            timeout=5,
+        )
+        if r.status_code != 200:
+            logging.error(
+                "Consul reachable but returned status %s", r.status_code
+            )
+            sys.exit(1)
     except Exception as e:
-        logging.error(f"Exception during upload to Consul: {e}")
+        logging.error("Cannot reach Consul at %s: %s", consul_url, e)
+        sys.exit(1)
+
+
+def read_file(path):
+    with open(path, "r") as f:
+        return f.read()
+
+
+def upload_to_consul(consul_url, key, content, token):
+    url = f"{consul_url}/v1/kv/{key}"
+    headers = {"X-Consul-Token": token}
+
+    r = requests.put(url, data=content.encode("utf-8"), headers=headers)
+    if r.status_code != 200:
+        logging.error(
+            "Failed to write KV %s (status %s): %s",
+            key,
+            r.status_code,
+            r.text,
+        )
+        return False
+
+    logging.info("Synced file to Consul KV: %s", key)
+    return True
+
 
 def main():
     args = parse_args()
 
-    if not os.path.isfile(args.file):
-        logging.error(f"File not found: {args.file}")
-        return
+    validate_file(args.file)
+    validate_consul(args.consul_url, args.token)
 
-    last_modified = None
+    logging.info("Starting Consul file sync")
+    logging.info("Watching file: %s", args.file)
+    logging.info("Consul URL: %s", args.consul_url)
+    logging.info("KV Key: %s", args.kv_key)
+
+    last_mtime = None
     last_content = None
-
-    logging.info(f"Watching file: {args.file} for changes...")
 
     while True:
         try:
             stat = os.stat(args.file)
-            if last_modified is None or stat.st_mtime != last_modified:
-                content = read_file_content(args.file)
-                if content is not None and content != last_content:
-                    upload_to_consul(args.consul_url, args.kv_key, content, args.token)
+
+            if last_mtime is None or stat.st_mtime != last_mtime:
+                content = read_file(args.file)
+
+                if content != last_content:
+                    upload_to_consul(
+                        args.consul_url,
+                        args.kv_key,
+                        content,
+                        args.token,
+                    )
                     last_content = content
-                last_modified = stat.st_mtime
+
+                last_mtime = stat.st_mtime
+
         except FileNotFoundError:
-            logging.warning(f"File disappeared: {args.file}")
-            last_modified = None
-            last_content = None
+            logging.error("File disappeared: %s", args.file)
+            sys.exit(1)
         except Exception as e:
-            logging.error(f"Error watching file: {e}")
+            logging.error("Unexpected error: %s", e)
 
         time.sleep(args.interval)
 
-if __name__ == "__main__":
-    logging.basicConfig(filename='uploadtoconsulkv.log',level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    main()
 
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+    )
+    main()
