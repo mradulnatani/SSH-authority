@@ -1,220 +1,170 @@
-# SSH-Authority — Introductory background
 
-This project implements a secure, policy-driven SSH Certificate Authority (CA) for issuing short-lived SSH certificates to control access across distributed infrastructure. Before diving into the implementation and usage, this document explains foundational concepts you should understand:
+# SSH Authority
 
-- A concise overview of the SSH protocol
-- How chain of trust works for SSH certificates
-- What OpenSSH certificates are (fields, types, constraints)
-- Recommended certificate generation and signing workflows, including the usual OpenSSH approach and how OpenSSL can participate (with caveats)
+SSH Authority is a policy-driven SSH user-certificate service. It provides a Django web application and API for user registration, group/role management, public-key submission, and certificate requests. OpenSSH `ssh-keygen` signs user keys with a CA key; the project also includes a Docker-based CA container, Consul configuration, HAProxy configuration, and a Consul file-sync utility.
 
----
+> Status and deployment note: The repository contains application code and infrastructure examples, but the checked-in Compose file does not run the Django application or a database. The Django app needs PostgreSQL, and its certificate-signing code needs access to the Docker daemon and the `certificate-authority` container. Configure and test these dependencies before using this project with real credentials. The included Consul ACL configuration uses `default_policy = "allow"` and is not suitable for production.
 
-## 1. SSH protocol — quick overview
+## Architecture
 
-SSH (Secure Shell) is a network protocol for secure remote login and other secure network services over an insecure network. Key points:
+The web application stores users, groups, public keys, and issued certificate records in PostgreSQL. An authenticated user submits a public key and requests signing; the app copies the key into the CA container, invokes `sign.sh`, and returns the resulting OpenSSH certificate. Consul/Confd and HAProxy are included for configuration distribution and service access; they are separate from the Django app's database and signing path.
 
-- SSH provides confidentiality and integrity using public-key cryptography and symmetric encryption negotiated per-connection.
-- Clients authenticate to servers using:
-  - Passwords (legacy, less desirable)
-  - Public-key authentication — the client proves ownership of a private key corresponding to a public key listed (or approved) on the server
-  - SSH certificates — a signed public key asserting one or more principals (usernames or hostnames) and metadata (validity etc.)
-- The server and client exchange cryptographic keys, then derive session keys for encryption and MACs.
-- SSH supports two common certificate use-cases:
-  - Host certificates — used by servers to prove their identity to clients
-  - User certificates — used by clients to authenticate to servers
+## Diagrams
 
-SSH certificates allow central, auditable, and short-lived credentials rather than distributing long-lived public keys into many servers' authorized_keys files.
+These diagrams are part of the repository and can be viewed directly in the `Diagrams/` directory.
 
----
+### Component diagram
 
-## 2. Chain of trust in SSH
+![SSH Authority component diagram](Diagrams/component_diagram.png)
 
-The SSH certificate model is much simpler than X.509 but shares the same trust principles:
+### Activity diagram
 
-- A CA (Certificate Authority) holds a private signing key (the CA private key).
-- The CA's public key is distributed to the verifying party (typically placed in `TrustedUserCAKeys` or `TrustedHostCAKeys` on SSH servers).
-- When a certificate (an SSH public key with CA signature and metadata) is presented, the server verifies the signature using the CA public key it trusts.
-- If the signature is valid and certificate metadata (principals, validity window, critical options, and extensions) satisfies local policy, authentication is granted.
+![SSH Authority activity diagram](Diagrams/activity_diagram.png)
 
-Important properties:
+### Sequence diagram
 
-- The "chain" is shallow: a certificate is directly signed by a single CA public key trusted by the verifier. OpenSSH does not use multi-level certificate chains in the same sense as PKI X.509 intermediate CAs.
-- Trust is established by configuring servers with the CA public key(s). A server trusts any certificate signed by the CA.
-- Revocation is not built into OpenSSH certificates (no standard CRL). Revocation patterns:
-  - Use very short certificate lifetimes (recommended).
-  - Rotate the CA key if needed (heavy-handed).
-  - Server-side allowlists (e.g., authorized principals files or external policy) that are checked at login time.
-  - External authorization systems (like this project) that validate and supply short-lived certificates according to policy.
+![SSH Authority sequence diagram](Diagrams/sequence_diagram.png)
 
----
+### Use-case diagram
 
-## 3. OpenSSH certificates — structure and fields
+![SSH Authority use-case diagram](Diagrams/use_case_diagram.png)
 
-OpenSSH certificates (the format produced and consumed by `ssh-keygen` and modern `sshd`) wrap a public key and metadata signed by a CA key. High-level structure and notable fields:
+### Class diagram
 
-- Type
-  - `ssh-user-cert` — for user authentication
-  - `ssh-host-cert` — for host authentication (signed with `-h`)
-- Key (the public key being certified)
-- Serial number — arbitrary 64-bit integer chosen by signer
-- Key ID (`-I`) — a human-readable identifier (recommended to be unique)
-- Principals (`-n`) — list of allowed usernames (for user certs) or hostnames (for host certs)
-- Validity (`-V`) — "valid after" and "valid before" timestamps (or intervals)
-- Critical options — options that must be enforced by the server; examples:
-  - `source-address` — restrict which source IPs may use the cert
-  - `force-command` — force a command to run (mainly for automation)
-- Extensions — server-side features allowed; common extensions:
-  - `permit-pty`, `permit-port-forwarding` etc.
-- Signature — the CA's signature over the above fields
+![SSH Authority class diagram](Diagrams/class_diagram.png)
 
-Behavioral notes:
+### Object diagram
 
-- When `sshd` is configured with `TrustedUserCAKeys /etc/ssh/ca_pubkey` any user certificate signed by that CA and otherwise acceptable will be treated as a valid authentication method.
-- Use of `AuthorizedPrincipalsFile` or `AuthorizedPrincipalsCommand` can control which principals on a server are allowed, giving extra fine-grained control.
+![SSH Authority object diagram](Diagrams/object_diagram.png)
 
----
+## Requirements
 
-## 4. Recommended certificate generation & signing (OpenSSH canonical flow)
+- Docker Engine and the Docker Compose plugin, for the supplied infrastructure containers.
+- Python 3.10 or later and `pip`, to run the Django application on the host. The included Dockerfile also builds the app image, but there is no app service in `docker-compose.yml`.
+- PostgreSQL reachable from the machine running Django.
+- OpenSSH client tools (`ssh-keygen`) in the CA container; the supplied CA image provides them.
 
-OpenSSH provides native tooling for SSH certificate creation and signing. This is the straightforward, recommended approach.
+## 1. Get the code
 
-1. Create a CA key (private and public)
 ```bash
-# CA private key (protected, stored securely)
-ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_ca -C "org-ca@example.com" -N "" 
-
-# CA public key (distribute this to servers, e.g., TrustedUserCAKeys)
-cat /etc/ssh/ssh_ca.pub
+git clone https://github.com/mradulnatani/SSH-authority.git
+cd SSH-authority
 ```
 
-2. Generate a user's key pair (on the user machine)
+## 2. Start the supporting containers
+
+The Compose file defines a five-server Consul cluster, a CA container, and an HAProxy frontend. Start those services explicitly:
+
 ```bash
-ssh-keygen -t rsa -b 3072 -f ~/.ssh/id_rsa_user -C "alice@example.com"
-# This creates ~/.ssh/id_rsa_user and ~/.ssh/id_rsa_user.pub
+docker compose up -d consul1 consul2 consul3 consul4 consul5 certificate-authority consul-lb
+docker compose ps
 ```
 
-3. Sign the user's public key with the CA
+Consul's UI/API is exposed at http://localhost:8500 and the HAProxy frontend at http://localhost:18500. The CA container is named `certificate-authority`; the app's signing code uses that exact Docker container name.
+
+The CA generates its key pair under `./ssh-ca` when it first starts. Keep the private key (`ssh-ca/id_rsa`) secret, restrict access to that directory, and back it up securely. The Compose file mounts the directory so the CA key persists across container recreation. Do not commit the private key.
+
+> The optional `consul-sync` Compose service currently runs `consul_sync.py` without its required `--file`, `--kv-key`, and `--token` arguments, so it will not start successfully as configured. Configure those arguments and an appropriately scoped Consul ACL token before using the sync utility. Do not use the example ACL policy for a production deployment.
+
+## 3. Configure PostgreSQL and Django
+
+Create a PostgreSQL database and user, then create `webtool/.env` with values for the settings read by `webtool/webtool/settings.py`:
+
+```dotenv
+SECRET_KEY=replace-with-a-long-random-django-secret
+JWT_SIGNING_KEY=replace-with-a-separate-long-random-secret
+DATABASE_NAME=ssh_authority
+DATABASE_USER=ssh_authority
+DATABASE_PASSWORD=replace-with-a-database-password
+DATABASE_HOST=127.0.0.1
+DATABASE_PORT=5432
+```
+
+Generate secrets rather than using the example text; for example, use Python's `secrets` module to generate random values. Do not commit `.env`. The settings currently hard-code `DEBUG = True` and `ALLOWED_HOSTS = ['*']`; change these for any deployment beyond local development.
+
+Install the application dependencies and apply database migrations:
+
 ```bash
-# run as the CA operator (not on the user's machine)
-ssh-keygen -s /etc/ssh/ssh_ca \
-    -I "alice-2025-12-23" \        # key id
-    -n "alice" \                   # principal(s)
-    -V +24h \                      # validity: 24 hours from now
-    -z 42 \                        # serial (optional)
-    /path/to/alice/id_rsa_user.pub
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -r webtool/requirements.txt
+cd webtool
+python manage.py migrate
+python manage.py createsuperuser
 ```
 
-4. Result: ssh certificate file
-- The signing step produces `id_rsa_user-cert.pub`. The user stores this alongside their private key and the SSH client automatically uses the certificate when authenticating.
+The settings use PostgreSQL, so a reachable database must be available before running migrations. The root `requirements.txt` is not needed for this Django setup; use `webtool/requirements.txt`.
 
-5. Server configuration (example `/etc/ssh/sshd_config`)
-```text
-TrustedUserCAKeys /etc/ssh/ca_pubkey
-# Optionally use an AuthorizedPrincipalsCommand to map cert principals to local accounts
-```
+## 4. Run the web application
 
-6. Inspect a certificate
+From the `webtool` directory, with the virtual environment active and PostgreSQL running:
+
 ```bash
-ssh-keygen -L -f id_rsa_user-cert.pub
+python manage.py runserver 127.0.0.1:8001
 ```
 
-Why use short lifetimes?
-- Because OpenSSH certificates do not use a revocation list, short lifetimes (minutes/hours) limit the impact of a compromised key.
+Open http://127.0.0.1:8001/ for the web interface or http://127.0.0.1:8001/admin/ for Django admin. The repository's Dockerfile starts uWSGI on port `8001`, but it does not provide a Compose service, PostgreSQL, or Docker-daemon access for the app; configure those separately if you choose to run the app in a container.
 
----
+## 5. Typical certificate flow
 
-## 5. Using OpenSSL in the workflow — caveats and recommended uses
+1. Register/sign in through the web app or the API and associate the user with an appropriate group.
+2. Submit the user's public SSH key to `POST /api/pub-key/` using a JWT bearer token.
+3. Request signing through `GET /api/keysign/` with the same authentication. The app invokes the CA container and returns an OpenSSH user certificate.
+4. Install the CA public key on SSH servers and configure `sshd` to trust it. For user certificates, configure `TrustedUserCAKeys` to point to the installed CA public key; review `AuthorizedPrincipalsFile` or `AuthorizedPrincipalsCommand` to restrict the principals each account accepts.
+5. Use the certificate alongside its matching private key to connect. Inspect a certificate with `ssh-keygen -L -f <certificate>-cert.pub`.
 
-OpenSSH certificates use a specific internal format (not X.509). The recommended toolset for generating SSH certificates is OpenSSH's `ssh-keygen`. OpenSSL is designed for X.509 certificates and PKCS formats, so it is not a drop-in tool for creating OpenSSH certificates. However, OpenSSL is still useful for:
+The signing script sets a one-day validity period and uses the identity and principals supplied by the app. Short-lived certificates reduce exposure, but they do not replace protecting the CA private key or enforcing server-side principal policy.
 
-- Generating raw RSA/ECDSA key material if you prefer OpenSSL tooling.
-- Managing an X.509-based PKI in parallel (if you also need TLS certificates).
-- Creating keys in PEM format that can be converted for use with ssh tools.
+### API routes
 
-Important caveats:
-- You cannot use OpenSSL alone to create OpenSSH certificates readable by `sshd`. The final signing step must be performed by `ssh-keygen` or equivalent OpenSSH-compatible signer.
-- If you generate keys with OpenSSL, you must convert or export them into a format `ssh-keygen` understands before signing or using them as SSH keys.
+Routes are defined in `webtool/webtool/urls.py`. Relevant endpoints include:
 
-Example: generate a private key with OpenSSL, produce an OpenSSH public key, and sign it with OpenSSH CA
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/register/` | Register a user |
+| `POST` | `/api/token/` | Obtain JWT access and refresh tokens |
+| `POST` | `/api/token/refresh/` | Refresh a JWT |
+| `POST` | `/api/pub-key/` | Submit an SSH public key (authenticated) |
+| `GET` | `/api/keysign/` | Request signing of the latest unsigned key (authenticated) |
+| `GET` | `/api/certificates/` | List the signed-in user's certificates (authenticated) |
+| `GET` | `/api/get-user/` | Get the signed-in user's profile (authenticated) |
+| `POST` | `/api/logout/` | Blacklist a refresh token (authenticated) |
+| `GET` | `/api/groups/` | List groups |
 
-1. Generate an RSA private key with OpenSSL
+Send authenticated requests with `Authorization: Bearer <access-token>`. Consult the application code before exposing endpoints: configuration and access-control behavior may need additional hardening.
+
+## Consul file-sync utility
+
+`consul_sync.py` watches a local file and writes its contents to a Consul KV key when it changes. It requires an absolute existing file path, Consul URL, KV key, and ACL token:
+
 ```bash
-openssl genpkey -algorithm RSA -out id_rsa.pem -pkeyopt rsa_keygen_bits:3072
+python consul_sync.py \
+  --file /absolute/path/to/file \
+  --consul-url http://localhost:8500 \
+  --kv-key path/to/key \
+  --token <consul-acl-secret-id> \
+  --interval 2
 ```
 
-2. Extract the public key and convert to OpenSSH public-key format
-- Many versions of `ssh-keygen` can read PEM private keys directly and emit the OpenSSH public key:
-```bash
-ssh-keygen -y -f id_rsa.pem > id_rsa.pub
-```
-- If `ssh-keygen -y` fails to parse the private key, convert it to an OpenSSH-compatible or PKCS8 PEM first:
-```bash
-# Convert to PKCS8 (if needed)
-openssl pkcs8 -topk8 -inform PEM -outform PEM -in id_rsa.pem -nocrypt -out id_rsa_pk8.pem
-ssh-keygen -y -f id_rsa_pk8.pem > id_rsa.pub
-```
+Use a narrowly scoped Consul token and protect it as a secret. The checked-in `consul-config/acl.hcl` has an allow-all default policy and should be replaced with a least-privilege policy before enabling ACLs in a real environment.
 
-3. Prepare a CA private key for `ssh-keygen` signing
-- Best practice: create the CA private key using `ssh-keygen` directly. If you already have a CA private key in PEM produced by OpenSSL, convert it into an OpenSSH private key format so `ssh-keygen -s` can use it. Some versions of `ssh-keygen` accept PEM private keys directly for signing; others require OpenSSH private key format.
-- Example preferred CA creation:
-```bash
-ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_ca -N ""
-```
+## Configuration and security checklist
 
-4. Sign with `ssh-keygen`
-```bash
-ssh-keygen -s /etc/ssh/ssh_ca -I "user-cert" -n "alice" -V +8h id_rsa.pub
-# Produces id_rsa-cert.pub
+- Keep `ssh-ca/id_rsa`, Django `SECRET_KEY`, `JWT_SIGNING_KEY`, database credentials, and Consul ACL tokens out of source control.
+- Replace the sample Consul ACL policy; limit access to the Consul UI/API and avoid exposing it publicly.
+- Set Django `DEBUG = False`, use a specific `ALLOWED_HOSTS` list, and configure HTTPS and secure cookie/proxy settings for deployment.
+- Restrict who can register, assign groups, upload keys, and request signatures. Validate the principals and identity that are signed.
+- Install only the CA public key on SSH servers and configure principal allowlists. Never distribute the CA private key.
+- Verify how certificate expiry and revocation are enforced. The app records revocation metadata, but OpenSSH servers do not automatically consult this application's database; short lifetimes and server-side policy remain important.
+- Review and test the checked-in Compose, Consul, HAProxy, and application configuration for your environment before production use.
+
+## Repository map
+
+- `webtool/` — Django application, UI, authentication API, models, and database settings.
+- `sign.sh` — invokes `ssh-keygen` using the CA private key mounted in the CA container.
+- `docker-compose.yml`, `Dockerfile` — infrastructure stack and application image recipe.
+- `consul-config/`, `consul_sync.py`, `run_confd.sh`, `haproxy.cfg` — Consul/Confd configuration and related utilities.
+- `Diagrams/` — project design diagrams embedded above.
 ```
 
-Summary:
-- Use OpenSSL for key generation if you must, but convert keys to OpenSSH-compatible forms and perform certificate signing with `ssh-keygen`.
-- For most SSH CA workflows you will only need `ssh-keygen` (recommended).
-
----
-
-## 6. Quick example: full flow (recommended)
-
-1. Create CA (on secure machine)
-```bash
-ssh-keygen -t ed25519 -f /etc/ssh/ca_ed25519 -C "example-org CA" -N ""
-# Keep /etc/ssh/ca_ed25519 private and secure. Distribute /etc/ssh/ca_ed25519.pub
-```
-
-2. Configure servers to trust the CA
-- Copy `/etc/ssh/ca_ed25519.pub` to servers and configure `/etc/ssh/sshd_config`:
-```text
-TrustedUserCAKeys /etc/ssh/ca_ed25519.pub
-```
-- Restart or reload sshd.
-
-3. User key generation (client)
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "alice@example.com"
-```
-
-4. Sign user's public key (CA operator)
-```bash
-ssh-keygen -s /etc/ssh/ca_ed25519 -I "alice@laptop-2025-12-23" -n alice -V +4h ~/.ssh/id_ed25519.pub
-# gives id_ed25519-cert.pub
-```
-
-5. User places `id_ed25519-cert.pub` next to their private key and connects:
-```bash
-ssh -i ~/.ssh/id_ed25519 alice@server.example.com
-```
-
----
-
-If helpful, next sections will cover:
-- How `sshd` enforces certificate fields (examples of `sshd_config` knobs)
-- Common signing policies and metadata (serial schemes, key IDs, principals)
-- Integration patterns: distributing CA public keys with Consul/Confd, dynamically issuing certs on login, and audit/logging of issuance (relevant to this project)
-- Secure storage and rotation of the CA private key (HSMs, offline signing workflows)
-
-If you'd like, I can now produce:
-- A more detailed step-by-step "operator's guide" for creating and rotating a CA
-- Example scripts to sign certificates automatically in response to API requests (aligned with this project's architecture)
-- A shorter "cheat sheet" of `ssh-keygen` commands and `sshd_config` snippets
-
-```
