@@ -17,11 +17,7 @@
       align-items: center;
       min-height: 100vh;
     }
-    h2 {
-      color: #60a5fa;
-      font-size: 28px;
-      margin-bottom: 25px;
-    }
+    h2 { color: #60a5fa; font-size: 28px; margin-bottom: 25px; }
     form {
       background: rgba(30, 41, 59, 0.85);
       padding: 35px 30px;
@@ -30,12 +26,7 @@
       max-width: 420px;
       width: 100%;
     }
-    label {
-      font-weight: 500;
-      display: block;
-      margin-bottom: 6px;
-      color: #cbd5e1;
-    }
+    label { font-weight: 500; display: block; margin-bottom: 6px; color: #cbd5e1; }
     input, select {
       width: 100%;
       padding: 12px 14px;
@@ -62,9 +53,7 @@
       font-weight: 600;
       cursor: pointer;
     }
-    button[type="submit"]:hover {
-      background-color: #2563eb;
-    }
+    button[type="submit"]:hover { background-color: #2563eb; }
     #response {
       margin-top: 20px;
       padding: 12px;
@@ -72,14 +61,9 @@
       text-align: center;
       font-weight: 500;
     }
-    .error {
-      background-color: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #f87171;
-    }
-    @media (max-width: 500px) {
-      form { padding: 25px 20px; }
-    }
+    .error { background-color: #fee2e2; color: #b91c1c; border: 1px solid #f87171; }
+    .hint { text-align: center; margin-top: 14px; font-size: 14px; }
+    .hint a { color: #60a5fa; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -93,92 +77,61 @@
     <option value="admin">Admin</option>
   </select>
 
-  <label>Email:</label>
+  <label for="email">Email:</label>
   <input type="email" id="email" required>
 
-  <label>Password:</label>
+  <label for="password">Password:</label>
   <input type="password" id="password" required>
 
-  <div id="groupContainer">
-    <label for="group">Group:</label>
-    <select id="group">
-      <option value="">Loading...</option>
-    </select>
-  </div>
-
   <button type="submit">Login</button>
+  <div class="hint">Need an account? <a href="/register/">Register</a></div>
 </form>
 
 <p id="response"></p>
 
 <script>
-  const roleSelect = document.getElementById("role");
-  const groupSelect = document.getElementById("group");
-  const groupContainer = document.getElementById("groupContainer");
-  const responseEl = document.getElementById("response");
-
-  function loadGroups() {
-    fetch("/api/groups/")
-      .then(res => res.json())
-      .then(groups => {
-        groupSelect.innerHTML = '<option value="">Select a group</option>';
-        groups.filter(g => g !== "ubuntu").forEach(group => {
-          const opt = document.createElement("option");
-          opt.value = group;
-          opt.textContent = group;
-          groupSelect.appendChild(opt);
-        });
-      })
-      .catch(err => {
-        groupSelect.innerHTML = '<option value="">Error loading groups</option>';
-      });
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return "";
   }
 
-  roleSelect.addEventListener("change", () => {
-    const isAdmin = roleSelect.value === "admin";
-    groupContainer.style.display = isAdmin ? "none" : "block";
-    if (isAdmin) groupSelect.removeAttribute("required");
-    else groupSelect.setAttribute("required", "required");
-  });
+  const roleSelect = document.getElementById("role");
+  const responseEl = document.getElementById("response");
 
-  roleSelect.dispatchEvent(new Event("change"));
-  loadGroups();
-
-  document.getElementById("loginForm").addEventListener("submit", function (e) {
+  document.getElementById("loginForm").addEventListener("submit", async function (e) {
     e.preventDefault();
     responseEl.className = "";
     responseEl.textContent = "";
 
     const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value.trim();
-    const group = roleSelect.value === "admin" ? "ubuntu" : groupSelect.value;
+    const password = document.getElementById("password").value;
+    const isAdmin = roleSelect.value === "admin";
+    const endpoint = isAdmin ? "/api/admin/login/" : "/api/token/";
+    const body = isAdmin ? { email, password, group: "ubuntu" } : { email, password };
 
-    if (!email || !password || (roleSelect.value === "user" && !group)) {
-      responseEl.textContent = "Please fill out all required fields.";
-      responseEl.className = "error";
-      return;
-    }
-
-    fetch("/api/token/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, group })
-    })
-    .then(res => res.json().then(data => ({ status: res.status, data })))
-    .then(({ status, data }) => {
-      if (status === 200) {
-        localStorage.setItem("access", data.access);
-        localStorage.setItem("refresh", data.refresh);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken")
+        },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (res.ok) {
         window.location.href = "/dashboard/";
       } else {
-        responseEl.textContent = data.detail || JSON.stringify(data);
+        responseEl.textContent = data.detail || data.non_field_errors?.[0] || JSON.stringify(data);
         responseEl.className = "error";
       }
-    })
-    .catch(err => {
-      responseEl.textContent = "Login failed: " + err;
+    } catch (err) {
+      responseEl.textContent = "Login failed: " + err.message;
       responseEl.className = "error";
-    });
+    }
   });
 </script>
 

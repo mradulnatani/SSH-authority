@@ -10,7 +10,6 @@
       margin: 0;
       padding: 0;
     }
-
     .navbar {
       background-color: #2c3e50;
       color: white;
@@ -19,12 +18,7 @@
       justify-content: space-between;
       align-items: center;
     }
-
-    .navbar h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-
+    .navbar h1 { margin: 0; font-size: 20px; }
     .nav-links a {
       color: white;
       text-decoration: none;
@@ -32,11 +26,7 @@
       font-weight: 500;
       cursor: pointer;
     }
-
-    .nav-links a:hover {
-      text-decoration: underline;
-    }
-
+    .nav-links a:hover { text-decoration: underline; }
     .container {
       max-width: 900px;
       margin: 40px auto;
@@ -45,7 +35,6 @@
       border-radius: 10px;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
-
     #submitKeyBtn {
       display: block;
       margin: 20px auto;
@@ -57,11 +46,7 @@
       border-radius: 6px;
       cursor: pointer;
     }
-
-    #submitKeyBtn:hover {
-      background-color: #21618c;
-    }
-
+    #submitKeyBtn:hover { background-color: #21618c; }
     #loadingSpinner {
       display: none;
       margin: 30px auto;
@@ -72,11 +57,7 @@
       height: 50px;
       animation: spin 1s linear infinite;
     }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
+    @keyframes spin { to { transform: rotate(360deg); } }
     #certContainer {
       display: none;
       margin-top: 30px;
@@ -89,12 +70,7 @@
       font-family: 'Courier New', Courier, monospace;
       color: #333;
     }
-
-    .info-metrics {
-      margin-top: 20px;
-      text-align: center;
-    }
-
+    .info-metrics { margin-top: 20px; text-align: center; }
     .metric {
       background: #ecf5ff;
       padding: 15px;
@@ -104,7 +80,6 @@
       font-size: 16px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-
     .progress-bar-container {
       background: #ccc;
       height: 10px;
@@ -112,15 +87,8 @@
       overflow: hidden;
       margin-top: 8px;
     }
-
-    .progress-bar {
-      height: 100%;
-      transition: width 0.3s ease-in-out;
-    }
-
-    #userInfo {
-      margin-bottom: 20px;
-    }
+    .progress-bar { height: 100%; transition: width 0.3s ease-in-out; }
+    #userInfo { margin-bottom: 20px; }
   </style>
 </head>
 <body>
@@ -153,12 +121,23 @@
 
     <button id="submitKeyBtn">Submit Public Key to Issue Certificate</button>
     <div id="loadingMessage" style="text-align:center; font-weight:bold; margin-top: 20px; display:none;">
-      ⏳ Certificate is being generated, please wait...
+      Certificate is being generated, please wait...
     </div>
     <div id="loadingSpinner"></div>
     <div id="certContainer"></div>
+
+    <div id="adminPanel" style="display:none; margin-top: 30px; padding: 20px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;">
+      <h3 style="margin-top:0; color:#2c3e50;">Admin: Manage Access Groups / Roles</h3>
+      <form id="createGroupForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="text" id="newGroupName" placeholder="Group / role name (e.g. devops)" required style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; flex:1; min-width:180px;">
+        <input type="text" id="newGroupTags" placeholder="Server tags (optional, e.g. dev,qa)" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; flex:1; min-width:180px;">
+        <button type="submit" style="padding:9px 18px; background:#2c3e50; color:#fff; border:none; border-radius:6px; cursor:pointer;">Create Group</button>
+      </form>
+      <p id="groupStatus" style="margin-top:10px; font-weight:500;"></p>
+      <div id="existingGroups" style="margin-top:10px; font-size:14px; color:#334155;"></div>
+    </div>
   </div>
-  
+
   <div style="text-align: center; margin-top: 30px;">
     <div style="
       display: inline-block;
@@ -176,26 +155,20 @@
         To use your certificate with SSH:
       </div>
       <code style="font-size: 15px; background: #f4f4f4; display: inline-block; padding: 6px 10px; border-radius: 4px;">
-       1. Submit the public key, from the .ssh file inside your system <br/>
-       2. Download the certificate <br/>
-       3. Now open the terminal on your local system, inside the ~/Downloads directory give the downloaded certificate file appropriate permissions <br/>
-      <b> > sudo chmod 600 your_certificate_file.pub </b>  <br/>
-       4. Now you can ssh in your respected server <br/>
-      <b>  > ssh -i yourcertificate.pub role@ip</b>
+        1. Submit your SSH public key (e.g. ~/.ssh/id_ed25519.pub)<br/>
+        2. Download the signed certificate as &lt;key&gt;-cert.pub<br/>
+        3. Restrict permissions: <b>chmod 600 ~/.ssh/id_ed25519-cert.pub</b><br/>
+        4. Connect: <b>ssh -i ~/.ssh/id_ed25519 &lt;role&gt;@&lt;server-ip&gt;</b>
       </code>
     </div>
   </div>
-  
-    
+
   <script>
-    function parseJwt(token) {
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = atob(base64Url.replace(/-/g, '+').replace(/_/g, '/'));
-        return JSON.parse(base64);
-      } catch (e) {
-        return null;
-      }
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return "";
     }
 
     function isValidSSHKey(key) {
@@ -203,192 +176,239 @@
       return sshKeyPattern.test(key.trim());
     }
 
-    const token = localStorage.getItem("access");
-    const refresh = localStorage.getItem("refresh");
+    let currentGroup = "ssh_certificate";
 
-    if (!token) {
-      window.location.href = "/login/";
-    } else {
-      const payload = parseJwt(token);
-      if (!payload || Date.now() >= payload.exp * 1000) {
-        localStorage.removeItem("access");
-        localStorage.removeItem("refresh");
+    function downloadCert(content) {
+      const safeRole = currentGroup.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const blob = new Blob([content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeRole}-cert.pub`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function loadDashboard() {
+      const userRes = await fetch("/api/get-user/", { credentials: "same-origin" });
+      if (userRes.status === 401 || userRes.status === 403) {
         window.location.href = "/login/";
+        return;
       }
-    }
+      const userData = await userRes.json();
+      currentGroup = userData.group || "ssh_certificate";
 
-    const headers = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    };
+      const userInfoEl = document.getElementById("userInfo");
+      userInfoEl.replaceChildren();
+      const emailP = document.createElement("p");
+      const emailStrong = document.createElement("strong");
+      emailStrong.textContent = "Email: ";
+      emailP.appendChild(emailStrong);
+      emailP.appendChild(document.createTextNode(userData.email || "N/A"));
 
-    const payload = parseJwt(token);
-    if (payload) {
-      document.getElementById("userInfo").innerHTML = `
-        <p><strong>Email:</strong> ${payload.email}</p>
-        <p><strong>Group:</strong> ${payload.group}</p>
-      `;
-    }
+      const groupP = document.createElement("p");
+      const groupStrong = document.createElement("strong");
+      groupStrong.textContent = "Group: ";
+      groupP.appendChild(groupStrong);
+      groupP.appendChild(document.createTextNode(currentGroup));
+      userInfoEl.append(emailP, groupP);
 
-    fetch("/api/certificates/", { headers })
-    .then(res => res.json())
-    .then(data => {
-      const certs = data.certificates || [];
-      const total = certs.length;
+      if (userData.is_admin) {
+        document.getElementById("adminPanel").style.display = "block";
+        await refreshAdminGroups();
+      }
 
-      document.getElementById("certCount").textContent = `Certificates Issued: ${total}`;
-      if (total > 0) {
-        const latest = certs[0];
-        const issued = new Date(latest.issued_at);
-        const expires = new Date(latest.valid_until);
-        const now = new Date();
+      const certsRes = await fetch("/api/certificates/", { credentials: "same-origin" });
+      if (certsRes.ok) {
+        const data = await certsRes.json();
+        const certs = data.certificates || [];
+        document.getElementById("certCount").textContent = `Certificates Issued: ${certs.length}`;
 
-        if (now < expires) {
+        const activeCert = certs.find(c => !c.revoked && new Date(c.valid_until) > new Date());
+        if (activeCert) {
+          const issued = new Date(activeCert.issued_at);
+          const expires = new Date(activeCert.valid_until);
+          const now = new Date();
           const submitBtn = document.getElementById("submitKeyBtn");
           submitBtn.disabled = true;
-          submitBtn.textContent = "Already Issued (Wait for Expiry)";
+          submitBtn.textContent = "Active Certificate Exists (Revoke or Wait for Expiry)";
           submitBtn.style.backgroundColor = "#95a5a6";
           submitBtn.style.cursor = "not-allowed";
+
+          const totalDuration = Math.max(1, expires - issued);
+          const timeLeft = Math.max(0, expires - now);
+          const percent = Math.max(0, Math.min(100, (timeLeft / totalDuration) * 100));
+
+          const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+          const hoursLeft = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+          const minutesLeft = Math.floor((timeLeft / (1000 * 60)) % 60);
+          document.getElementById("expiryTime").textContent = `${daysLeft}d ${hoursLeft}h ${minutesLeft}m remaining`;
+
+          const bar = document.getElementById("expiryProgress");
+          bar.style.width = percent + "%";
+          bar.style.backgroundColor = percent < 20 ? "#e74c3c" : percent < 50 ? "#f39c12" : "#27ae60";
+        } else {
+          document.getElementById("expiryTime").textContent =
+            certs.length > 0 ? "No active (non-revoked, unexpired) certificate." : "No certificates issued.";
         }
-
-        const totalDuration = expires - issued;
-        const timeLeft = expires - now;
-        const percent = Math.max(0, Math.min(100, (timeLeft / totalDuration) * 100));
-
-        if (timeLeft <= 0) {
-  document.getElementById("expiryTime").textContent = "Expired";
-} else {
-  const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-  const hoursLeft = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
-  const minutesLeft = Math.floor((timeLeft / (1000 * 60)) % 60);
-
-  document.getElementById("expiryTime").textContent =
-    `${daysLeft}d ${hoursLeft}h ${minutesLeft}m remaining`;
-}
-
-
-        const bar = document.getElementById("expiryProgress");
-        bar.style.width = percent + "%";
-        bar.style.backgroundColor =
-          percent < 20 ? "#e74c3c" :
-          percent < 50 ? "#f39c12" : "#27ae60";
-      } else {
-        document.getElementById("expiryTime").textContent = "No certificates issued.";
       }
-    });
 
-    document.getElementById("logoutBtn").addEventListener("click", function (e) {
+      const ipsRes = await fetch("/api/group-ips/", { credentials: "same-origin" });
+      if (ipsRes.ok) {
+        const data = await ipsRes.json();
+        const ips = data.ips || [];
+        const container = document.createElement("div");
+        container.className = "metric";
+        const label = document.createElement("strong");
+        label.textContent = "Accessible Server IPs:";
+        container.appendChild(label);
+        if (ips.length === 0) {
+          const none = document.createElement("div");
+          none.textContent = "None registered";
+          container.appendChild(none);
+        } else {
+          ips.forEach(ip => {
+            const code = document.createElement("code");
+            code.style.display = "block";
+            code.style.marginTop = "5px";
+            code.textContent = ip;
+            container.appendChild(code);
+          });
+        }
+        document.querySelector(".info-metrics").appendChild(container);
+      }
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", async function (e) {
       e.preventDefault();
-      fetch("/api/logout/", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ refresh })
-      })
-      .then(res => {
+      try {
+        const res = await fetch("/api/logout/", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify({})
+        });
         if (res.ok) {
-          localStorage.removeItem("access");
-          localStorage.removeItem("refresh");
           window.location.href = "/login/";
         } else {
           alert("Logout failed.");
         }
-      })
-      .catch(err => {
-        console.error("Logout error", err);
+      } catch (err) {
         alert("Logout error occurred.");
-      });
+      }
     });
 
-    document.getElementById("submitKeyBtn").addEventListener("click", () => {
+    document.getElementById("submitKeyBtn").addEventListener("click", async () => {
       const pubKey = prompt("Paste your SSH public key:");
       if (!pubKey) return alert("Public key is required!");
+      if (!isValidSSHKey(pubKey)) return alert("Invalid SSH public key format.");
 
-      if (!isValidSSHKey(pubKey)) {
-        return alert("Invalid SSH public key format.");
-      }
+      const spinner = document.getElementById("loadingSpinner");
+      const msg = document.getElementById("loadingMessage");
+      const certContainer = document.getElementById("certContainer");
 
-      document.getElementById("loadingMessage").style.display = "block";
-      document.getElementById("loadingSpinner").style.display = "block";
-      document.getElementById("certContainer").style.display = "none";
-      document.getElementById("certContainer").innerText = "";
+      msg.style.display = "block";
+      spinner.style.display = "block";
+      certContainer.style.display = "none";
+      certContainer.replaceChildren();
 
-      fetch("/api/pub-key/", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ key: pubKey })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.message) {
-          fetch("/api/keysign/", {
-            method: "GET",
-            headers
-          })
-          .then(res => res.text())
-          .then(cert => {
-  document.getElementById("loadingSpinner").style.display = "none";
-  document.getElementById("loadingMessage").style.display = "none";
-
-  document.getElementById("certContainer").innerHTML = `
-  <div style="margin-bottom: 15px;">${cert.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
-  <button onclick="downloadCert(\`${cert.replace(/`/g, '\\`')}\`)" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
-    ⬇ Download Certificate
-  </button>
-`;
-
-document.getElementById("certContainer").style.display = "block";
-
-})
-
-          .catch(err => {
-            document.getElementById("loadingSpinner").style.display = "none";
-            document.getElementById("loadingMessage").style.display = "none";
-            document.getElementById("certContainer").style.display = "block";
-            document.getElementById("certContainer").innerText = "Signing failed: " + err;
-          });
-        } else {
-          alert("Key upload failed: " + JSON.stringify(data));
-          document.getElementById("loadingSpinner").style.display = "none";
-          document.getElementById("loadingMessage").style.display = "none";
+      try {
+        const uploadRes = await fetch("/api/pub-key/", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify({ key: pubKey })
+        });
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadData.error || JSON.stringify(uploadData));
         }
-      })
-      .catch(err => {
-        alert("Error uploading key: " + err);
-        document.getElementById("loadingSpinner").style.display = "none";
-        document.getElementById("loadingMessage").style.display = "none";
-      });
+
+        const signRes = await fetch("/api/keysign/", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify({})
+        });
+        const signBody = await signRes.text();
+        if (!signRes.ok) {
+          throw new Error(signBody);
+        }
+
+        const textDiv = document.createElement("div");
+        textDiv.style.marginBottom = "15px";
+        textDiv.textContent = signBody;
+
+        const dlBtn = document.createElement("button");
+        dlBtn.textContent = "Download Certificate";
+        dlBtn.style.cssText = "padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;";
+        dlBtn.addEventListener("click", () => downloadCert(signBody));
+
+        certContainer.append(textDiv, dlBtn);
+        certContainer.style.display = "block";
+      } catch (err) {
+        certContainer.style.display = "block";
+        certContainer.textContent = "Signing failed: " + err.message;
+      } finally {
+        spinner.style.display = "none";
+        msg.style.display = "none";
+      }
     });
-   
-    function downloadCert(content) {
-  const role = payload.group || "ssh_certificate";
-  const safeRole = role.replace(/[^a-zA-Z0-9_-]/g, "_"); 
-  const blob = new Blob([content], { type: "application/x-pem-file" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${safeRole}.pub`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 
-// Fetch and display accessible IPs based on group
-fetch("/api/group-ips/", { headers })
-  .then(res => res.json())
-  .then(data => {
-    const ips = data.ips || [];
-    const container = document.createElement("div");
-    container.className = "metric";
-    container.innerHTML = `
-      <strong>Accessible Server IPs:</strong><br>
-      ${ips.map(ip => `<code style="display:block; margin-top: 5px;">${ip}</code>`).join('')}
-    `;
-    document.querySelector(".info-metrics").appendChild(container);
-  })
-  .catch(err => console.error("Failed to load group IPs:", err));
+    loadDashboard().catch(err => console.error("Dashboard load error:", err));
 
+    async function refreshAdminGroups() {
+      const res = await fetch("/api/groups/", { credentials: "same-origin" });
+      if (!res.ok) return;
+      const groups = await res.json();
+      const box = document.getElementById("existingGroups");
+      box.textContent = "Existing groups: " + (groups.length ? groups.join(", ") : "none");
+    }
 
+    document.getElementById("createGroupForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById("groupStatus");
+      const name = document.getElementById("newGroupName").value.trim();
+      const server_tags = document.getElementById("newGroupTags").value.trim() || name;
+      statusEl.textContent = "";
+
+      try {
+        const res = await fetch("/api/groups/", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify({ name, server_tags })
+        });
+        const data = await res.json();
+        if (res.status === 201) {
+          statusEl.style.color = "#15803d";
+          statusEl.textContent = `Group '${data.name}' created.`;
+          document.getElementById("newGroupName").value = "";
+          document.getElementById("newGroupTags").value = "";
+          await refreshAdminGroups();
+        } else {
+          statusEl.style.color = "#b91c1c";
+          statusEl.textContent = data.error || JSON.stringify(data);
+        }
+      } catch (err) {
+        statusEl.style.color = "#b91c1c";
+        statusEl.textContent = "Error: " + err.message;
+      }
+    });
   </script>
 </body>
 </html>
