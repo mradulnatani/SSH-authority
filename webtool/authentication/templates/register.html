@@ -17,13 +17,7 @@
       --error-border: #f87171;
       --error-text: #b91c1c;
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', sans-serif;
       background-color: var(--bg-color);
@@ -34,31 +28,16 @@
       padding: 2rem;
       min-height: 100vh;
     }
-
     form {
       background-color: var(--form-bg);
       padding: 2rem;
       border-radius: 1rem;
-      max-width: 400px;
+      max-width: 420px;
       width: 100%;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-      animation: fadeIn 0.5s ease-in-out;
     }
-
-    h2 {
-      text-align: center;
-      margin-bottom: 1.5rem;
-      color: var(--accent-color);
-      font-size: 1.75rem;
-    }
-
-    label {
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: var(--muted-text);
-      display: block;
-    }
-
+    h2 { text-align: center; margin-bottom: 1.5rem; color: var(--accent-color); font-size: 1.75rem; }
+    label { font-weight: 600; margin-bottom: 0.4rem; color: var(--muted-text); display: block; }
     input, select {
       width: 100%;
       padding: 0.75rem;
@@ -69,13 +48,11 @@
       color: var(--text-color);
       font-size: 1rem;
     }
-
     input:focus, select:focus {
       outline: none;
       border-color: var(--accent-color);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
     }
-
     button {
       width: 100%;
       background-color: var(--accent-color);
@@ -86,57 +63,15 @@
       font-weight: 600;
       font-size: 1rem;
       cursor: pointer;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
     }
-
-    button:hover {
-      background-color: var(--accent-hover);
-    }
-
-    p {
-      text-align: center;
-      font-size: 0.9rem;
-      margin-top: 1rem;
-    }
-
-    a {
-      color: var(--accent-color);
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    #error {
-      margin-top: 1rem;
-      padding: 0.75rem;
-      border-radius: 0.5rem;
-      text-align: center;
-      font-weight: 500;
-    }
-
-    .error {
-      background-color: var(--error-bg);
-      color: var(--error-text);
-      border: 1px solid var(--error-border);
-    }
-
-    .success {
-      background-color: #dcfce7;
-      color: #15803d;
-      border: 1px solid #4ade80;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @media (max-width: 500px) {
-      form { padding: 1.5rem; }
-    }
+    button:hover { background-color: var(--accent-hover); }
+    p { text-align: center; font-size: 0.9rem; margin-top: 1rem; }
+    a { color: var(--accent-color); text-decoration: none; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+    #error { margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem; text-align: center; font-weight: 500; }
+    .error { background-color: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); }
+    .success { background-color: #dcfce7; color: #15803d; border: 1px solid #4ade80; }
   </style>
 </head>
 <body>
@@ -151,11 +86,10 @@
     </select>
 
     <label for="email">Email:</label>
-    <input type="email" id="email" maxlength="50" required>
-    
+    <input type="email" id="email" maxlength="254" required>
+
     <label for="username">Username:</label>
-    <input type="text" id="username" maxlength="10" required>
-    
+    <input type="text" id="username" maxlength="32" required>
 
     <label for="password">Password:</label>
     <input type="password" id="password" required>
@@ -167,6 +101,11 @@
       </select>
     </div>
 
+    <div id="tokenContainer">
+      <label for="registrationToken" id="tokenLabel">Invite Code (if required):</label>
+      <input type="password" id="registrationToken" placeholder="Optional unless required by server">
+    </div>
+
     <button type="submit">Register</button>
 
     <p>Already have an account? <a href="/login/">Login</a></p>
@@ -174,39 +113,74 @@
   </form>
 
   <script>
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return "";
+    }
+
     const roleSelect = document.getElementById("roleSelect");
     const groupSelect = document.getElementById("group");
     const groupContainer = document.getElementById("groupContainer");
+    const tokenLabel = document.getElementById("tokenLabel");
+    const tokenInput = document.getElementById("registrationToken");
     const errorEl = document.getElementById("error");
 
-    function loadGroups() {
-      fetch("/api/groups/")
-        .then(response => response.json())
-        .then(groups => {
-          groupSelect.innerHTML = '<option value="">Select a group</option>';
-          groups.filter(g => g !== "ubuntu").forEach(group => {
-            const option = document.createElement("option");
-            option.value = group;
-            option.textContent = group;
-            groupSelect.appendChild(option);
-          });
-        })
-        .catch(err => {
-          groupSelect.innerHTML = '<option value="">Failed to load groups</option>';
+    async function loadGroups() {
+      try {
+        const res = await fetch("/api/registration-groups/", { credentials: "same-origin" });
+        if (!res.ok) {
+          groupSelect.replaceChildren();
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "Self-registration disabled";
+          groupSelect.appendChild(opt);
+          return;
+        }
+        const groups = await res.json();
+        groupSelect.replaceChildren();
+        const nonAdminGroups = groups.filter(g => g !== "ubuntu");
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = nonAdminGroups.length === 0
+          ? "No roles configured yet (create Admin first)"
+          : "Select a group";
+        groupSelect.appendChild(placeholder);
+
+        nonAdminGroups.forEach(group => {
+          const option = document.createElement("option");
+          option.value = group;
+          option.textContent = group;
+          groupSelect.appendChild(option);
         });
+      } catch (err) {
+        groupSelect.replaceChildren();
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Failed to load groups";
+        groupSelect.appendChild(opt);
+      }
     }
 
     roleSelect.addEventListener("change", () => {
       const isAdmin = roleSelect.value === "admin";
       groupContainer.style.display = isAdmin ? "none" : "block";
-      if (isAdmin) groupSelect.removeAttribute("required");
-      else groupSelect.setAttribute("required", "required");
+      tokenLabel.textContent = isAdmin ? "Admin Bootstrap Token:" : "Invite Code (if required):";
+      tokenInput.placeholder = isAdmin ? "Required ADMIN_BOOTSTRAP_TOKEN" : "Optional unless required by server";
+      if (isAdmin) {
+        groupSelect.removeAttribute("required");
+        tokenInput.setAttribute("required", "required");
+      } else {
+        groupSelect.setAttribute("required", "required");
+        tokenInput.removeAttribute("required");
+      }
     });
 
     roleSelect.dispatchEvent(new Event("change"));
     loadGroups();
 
-    document.getElementById("registerForm").addEventListener("submit", function (e) {
+    document.getElementById("registerForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       errorEl.className = "";
       errorEl.textContent = "";
@@ -216,21 +190,11 @@
       const password = document.getElementById("password").value;
       const role = roleSelect.value;
       const group = role === "admin" ? "ubuntu" : groupSelect.value;
+      const tokenVal = tokenInput.value.trim();
 
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const usernamePattern = /^[A-Za-z_]+$/;
-
-      if (email.length > 40) {
-  errorEl.textContent = "Email must be no longer than 20 characters.";
-  errorEl.className = "error";
-  return;
-}
-
-if (username.length > 10) {
-  errorEl.textContent = "Username must be no longer than 10 characters.";
-  errorEl.className = "error";
-  return;
-}
+      const usernamePattern = /^[a-zA-Z_][a-zA-Z0-9._-]{1,31}$/;
+      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
       if (!emailPattern.test(email)) {
         errorEl.textContent = "Please enter a valid email address.";
@@ -239,44 +203,51 @@ if (username.length > 10) {
       }
 
       if (!usernamePattern.test(username)) {
-        errorEl.textContent = "Username should contain only letters and underscores.";
+        errorEl.textContent = "Username must be 2-32 chars (letters, digits, '.', '_', '-') starting with a letter or '_'.";
         errorEl.className = "error";
         return;
       }
 
-      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+      if (!passwordPattern.test(password)) {
+        errorEl.textContent = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+        errorEl.className = "error";
+        return;
+      }
 
-if (!passwordPattern.test(password)) {
-  errorEl.textContent =
-    "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
-  errorEl.className = "error";
-  return;
-}
+      const payload = { email, username, password, group };
+      const headers = {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken")
+      };
 
-const payload = { email, username, password, group };
-const endpoint = role === "admin" ? "/api/admin/register/" : "/api/register/";
+      if (role === "admin") {
+        headers["X-Bootstrap-Token"] = tokenVal;
+      } else if (tokenVal) {
+        payload.invite_code = tokenVal;
+      }
 
+      const endpoint = role === "admin" ? "/api/admin/register/" : "/api/register/";
 
-      fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload) 
-      })
-      .then(res => res.json().then(data => ({ status: res.status, data })))
-      .then(({ status, data }) => {
-        if (status === 201) {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          credentials: "same-origin",
+          headers,
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.status === 201) {
           errorEl.textContent = "Registration successful! Redirecting...";
           errorEl.className = "success";
-          setTimeout(() => window.location.href = "/login/", 1500);
+          setTimeout(() => { window.location.href = "/login/"; }, 1500);
         } else {
-          errorEl.textContent = data.detail || JSON.stringify(data);
+          errorEl.textContent = data.error || data.detail || JSON.stringify(data);
           errorEl.className = "error";
         }
-      })
-      .catch(error => {
-        errorEl.textContent = "Error: " + error;
+      } catch (error) {
+        errorEl.textContent = "Error: " + error.message;
         errorEl.className = "error";
-      });
+      }
     });
   </script>
 

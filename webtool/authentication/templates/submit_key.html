@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Submit Public Key</title>
 </head>
 <body>
-  <h2>🔐 Submit Your Public Key</h2>
+  <h2>Submit Your Public Key</h2>
 
   <textarea id="publicKey" rows="10" cols="60" placeholder="Paste your SSH public key here..."></textarea><br><br>
   <button id="uploadBtn">Upload Key</button>
@@ -13,35 +14,46 @@
   <button onclick="window.location.href='/dashboard/'">Back to Dashboard</button>
 
   <script>
-    document.getElementById("uploadBtn").addEventListener("click", () => {
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return "";
+    }
+
+    document.getElementById("uploadBtn").addEventListener("click", async () => {
       const key = document.getElementById("publicKey").value.trim();
-      const token = localStorage.getItem("access");
+      const statusEl = document.getElementById("status");
 
       if (!key) {
-        document.getElementById("status").innerText = "Please paste your public key.";
+        statusEl.textContent = "Please paste your public key.";
         return;
       }
 
-      fetch("/api/pub-key/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ key: key })
-      })
-      .then(response => response.json().then(data => ({ status: response.status, body: data })))
-      .then(({ status, body }) => {
-        if (status === 201) {
-          document.getElementById("status").innerText = "Public key uploaded successfully!";
+      try {
+        const response = await fetch("/api/pub-key/", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify({ key })
+        });
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = "/login/";
+          return;
+        }
+        const body = await response.json();
+        if (response.status === 201) {
+          statusEl.textContent = "Public key uploaded successfully!";
           document.getElementById("publicKey").value = "";
         } else {
-          document.getElementById("status").innerText = "Failed: " + JSON.stringify(body);
+          statusEl.textContent = "Failed: " + (body.error || JSON.stringify(body));
         }
-      })
-      .catch(err => {
-        document.getElementById("status").innerText = "Error: " + err;
-      });
+      } catch (err) {
+        statusEl.textContent = "Error: " + err.message;
+      }
     });
   </script>
 </body>

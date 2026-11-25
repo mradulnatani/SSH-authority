@@ -1,505 +1,543 @@
+import hmac
+import ipaddress
+import logging
+import time
 
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from .serializers import CustomTokenObtainPairSerializer, UserSerializer
-from rest_framework.decorators import api_view,permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
-from .models import Group
-from .models import PublicKey
-from .models import GroupIP
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view
-from django.utils.decorators import method_decorator
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from .models import PublicKey
-from .models import Group
-from .models import Certificate
-from datetime import timedelta
+from django.conf import settings
+from django.db import connection, transaction
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-import subprocess
-import tempfile
-import os
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
-from authentication.models import ActivityLog  
-from .models import CustomUser
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-#pem_path = os.path.expanduser("~/Downloads/formradul.pem")
-#command = f"ssh -i {pem_path} ubuntu@54.159.193.62"
+from .models import ActivityLog, Certificate, CustomUser, Group, GroupIP, PublicKey
+from .serializers import CustomTokenObtainPairSerializer, UserSerializer
+from .signing import (
+    CASigningError,
+    check_ca_signer_health,
+    parse_validity_timedelta,
+    request_certificate_signature,
+)
+from .ssh_utils import SSHValidationError, validate_principal, validate_ssh_public_key
+
+logger = logging.getLogger(__name__)
+
+
+class AuthRateThrottle(ScopedRateThrottle):
+    scope = "auth"
+
+
+class SigningRateThrottle(ScopedRateThrottle):
+    scope = "signing"
+
+
+def log_activity(user, event: str, metadata: dict | None = None) -> None:
+    ActivityLog.objects.create(user=user, event=event, metadata=metadata or {})
+
+
+def _set_auth_cookies(response: Response, access: str | None, refresh: str | None) -> None:
+    if access:
+        response.set_cookie(
+            key=settings.JWT_ACCESS_COOKIE_NAME,
+            value=access,
+            max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()),
+            httponly=True,
+            secure=settings.JWT_COOKIE_SECURE,
+            samesite="Lax",
+            path="/",
+        )
+    if refresh:
+        response.set_cookie(
+            key=settings.JWT_REFRESH_COOKIE_NAME,
+            value=refresh,
+            max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+            httponly=True,
+            secure=settings.JWT_COOKIE_SECURE,
+            samesite="Lax",
+            path="/",
+        )
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(settings.JWT_ACCESS_COOKIE_NAME, path="/", samesite="Lax")
+    response.delete_cookie(settings.JWT_REFRESH_COOKIE_NAME, path="/", samesite="Lax")
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-  
-@method_decorator(csrf_exempt, name='dispatch')
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0]) from exc
+
+        data = serializer.validated_data
+        response = Response(data, status=status.HTTP_200_OK)
+        _set_auth_cookies(response, data.get("access"), data.get("refresh"))
+        return response
+
+
+class AdminTokenObtainPairView(CustomTokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        data["group"] = "ubuntu"
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        response = Response(validated, status=status.HTTP_200_OK)
+        _set_auth_cookies(response, validated.get("access"), validated.get("refresh"))
+        return response
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request, *args, **kwargs):
+        data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        if not data.get("refresh"):
+            cookie_refresh = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+            if cookie_refresh:
+                data["refresh"] = cookie_refresh
+
+        serializer = self.get_serializer(data=data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0]) from exc
+
+        validated = serializer.validated_data
+        response = Response(validated, status=status.HTTP_200_OK)
+        _set_auth_cookies(response, validated.get("access"), validated.get("refresh"))
+        return response
+
+
 class AdminRegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
-        if CustomUser.objects.filter(group__name='ubuntu').exists():
-            return Response({'error': 'Admin user already exists.'}, status=status.HTTP_403_FORBIDDEN)
+        if not settings.ADMIN_BOOTSTRAP_TOKEN:
+            return Response(
+                {"error": "Admin bootstrap registration is disabled (ADMIN_BOOTSTRAP_TOKEN not set)."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        # Force group = ubuntu regardless of what the request sends
-        data = request.data.copy()
-        data['group'] = 'ubuntu'
+        provided_token = (
+            request.headers.get("X-Bootstrap-Token")
+            or request.data.get("bootstrap_token")
+            or ""
+        )
+        if not hmac.compare_digest(str(provided_token), settings.ADMIN_BOOTSTRAP_TOKEN):
+            return Response({"error": "Invalid bootstrap token."}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = UserSerializer(data=data)
+        if CustomUser.objects.filter(group__name="ubuntu").exists():
+            return Response({"error": "Admin user already exists."}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        data["group"] = "ubuntu"
+
+        serializer = UserSerializer(data=data, context={"is_admin_registration": True})
         if serializer.is_valid():
             user = serializer.save()
+            log_activity(user, "admin_registered", {"group": "ubuntu"})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AdminTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
-
-    def post(self, request, *args, **kwargs):
-        # Force the group in request to be "ubuntu"
-        request.data._mutable = True
-        request.data["group"] = "ubuntu"
-        request.data._mutable = False
-        return super().post(request, *args, **kwargs)
-
-class CustomTokenRefreshView(TokenRefreshView):
-    pass
-
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
-        serializer = UserSerializer(data=request.data)
+        if not settings.ALLOW_SELF_REGISTRATION:
+            return Response(
+                {"error": "Self-registration is disabled. Contact an administrator."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if settings.REGISTRATION_INVITE_CODE:
+            invite = str(request.data.get("invite_code", ""))
+            if not hmac.compare_digest(invite, settings.REGISTRATION_INVITE_CODE):
+                return Response({"error": "Valid invite code is required."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = UserSerializer(data=request.data, context={"is_admin_registration": False})
         if serializer.is_valid():
             user = serializer.save()
-            if user:
-                json = serializer.data
-                return Response(json, status=status.HTTP_201_CREATED)
+            log_activity(user, "user_registered", {"group": user.group.name})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@csrf_exempt
-@api_view(['POST'])
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def receive_tags(request):
-    print("Raw request data:", request.data)
-    tags = request.data.get('tags', [])
-    public_ip = request.data.get('public_ip')
+    if not settings.TAG_SYNC_TOKEN:
+        return Response(
+            {"error": "Tag sync endpoint is disabled (TAG_SYNC_TOKEN not configured)."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    provided_token = request.headers.get("X-Service-Token", "")
+    if not hmac.compare_digest(str(provided_token), settings.TAG_SYNC_TOKEN):
+        return Response({"error": "Invalid service token."}, status=status.HTTP_401_UNAUTHORIZED)
+
+    tags = request.data.get("tags", [])
+    public_ip = str(request.data.get("public_ip", "")).strip()
 
     if not isinstance(tags, list) or not public_ip:
-        return Response({"error": "Invalid format for tags or missing IP"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Invalid format for tags or missing IP."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        ipaddress.ip_address(public_ip)
+    except ValueError:
+        return Response({"error": "Invalid public_ip address."}, status=status.HTTP_400_BAD_REQUEST)
 
     created_groups = []
+    processed_tags = []
 
-    for tag in tags:
-        tag = tag.strip()
+    for raw_tag in tags:
+        if not isinstance(raw_tag, str):
+            return Response({"error": "Each tag must be a string."}, status=status.HTTP_400_BAD_REQUEST)
+        tag = raw_tag.strip()
         if not tag:
             continue
+        try:
+            validate_principal(tag)
+        except SSHValidationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        group, created = Group.objects.get_or_create(
-            name=tag,
-            defaults={'server_tags': tag}
-        )
+        group, created = Group.objects.get_or_create(name=tag, defaults={"server_tags": tag})
         if created:
             created_groups.append(group.name)
 
         GroupIP.objects.get_or_create(
             group_name=tag,
-            public_ip=public_ip
+            public_ip=public_ip,
+            defaults={"group": group},
         )
+        processed_tags.append(tag)
 
-    return Response({
-        "message": "Tags and IP processed successfully",
-        "created_groups": created_groups,
-        "received_tags": tags,
-        "saved_ip": public_ip
-    }, status=status.HTTP_200_OK)
+    logger.info("Processed %d tags for IP %s", len(processed_tags), public_ip)
+    return Response(
+        {
+            "message": "Tags and IP processed successfully",
+            "created_groups": created_groups,
+            "received_tags": processed_tags,
+            "saved_ip": public_ip,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
-
-@csrf_exempt
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_group_ips(request):
-    user_group = getattr(request.user, 'group', None)
+    user_group = getattr(request.user, "group", None)
     if not user_group:
-        return Response({"error": "User group not found"}, status=400)
+        return Response({"error": "User group not found."}, status=status.HTTP_400_BAD_REQUEST)
 
-    group_ips = GroupIP.objects.filter(group_name=user_group.name).values_list('public_ip', flat=True)
+    group_ips = GroupIP.objects.filter(group_name=user_group.name).values_list("public_ip", flat=True)
+    return Response({"group": user_group.name, "ips": list(group_ips)})
 
-    return Response({
-        "group": user_group.name,
-        "ips": list(group_ips)
-    })
 
-@csrf_exempt
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def pub_key(request):
-    print("Raw request data:", request.data)
-    
-    key_data = request.data.get('key')
+    raw_key = request.data.get("key")
+    try:
+        parsed = validate_ssh_public_key(raw_key)
+    except SSHValidationError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not key_data:
-        return Response({'error': 'Public key is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    key_obj = PublicKey.objects.create(
+        user=request.user,
+        key_data=parsed.normalized_key,
+        key_type=parsed.key_type,
+        fingerprint=parsed.fingerprint_sha256,
+    )
+    log_activity(
+        request.user,
+        "public_key_uploaded",
+        {"key_id": key_obj.id, "key_type": parsed.key_type, "fingerprint": parsed.fingerprint_sha256},
+    )
+    return Response(
+        {
+            "message": "Public key uploaded successfully.",
+            "key_type": parsed.key_type,
+            "fingerprint": parsed.fingerprint_sha256,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
-    # saves the key to the DB
-    PublicKey.objects.create(user=request.user, key_data=key_data)
 
-    return Response({'message': 'Public key uploaded successfully.'}, status=status.HTTP_201_CREATED)
-
-
-@csrf_exempt
-@api_view(['GET'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([SigningRateThrottle])
 def keysign(request):
-    return sign_key_on_remote_ca(request)
-    # try:
-    #     public_key_obj = PublicKey.objects.filter(user=request.user, signed=False).latest('uploaded_at')
-    #     public_key = public_key_obj.key_data
-    #     user_groups = request.user.custom_groups.all()
-        
-    #     if not user_groups.exists():
-    #         return Response({'error': 'No group associated with this user'}, status=status.HTTP_403_FORBIDDEN)
+    return sign_key_with_ca(request)
 
-    #     group = user_groups.first()
-    #     roles = list(user_groups.values_list('name', flat=True))
-    #     username = request.user.username
 
-    #     # Step 1: Write public key to temp file
-    #     with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-    #         f.write(public_key)
-    #         pub_path = f.name
+def sign_key_with_ca(request):
+    now = timezone.now()
+    validity = settings.SSH_CERT_VALIDITY
 
-    #     # Step 2: Copy public key to container
-    #     container_path = f"/tmp/{os.path.basename(pub_path)}"
-    #     subprocess.run(["docker", "cp", pub_path, f"certificate-authority:{container_path}"], check=True)
+    try:
+        validity_delta = parse_validity_timedelta(validity)
+    except CASigningError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    #     # Step 3: Execute signing script in container
-    #     subprocess.run([
-    #         "docker", "exec", "certificate-authority", "bash", "-c",
-    #         f"/usr/local/bin/sign.sh {container_path} {username} \"{','.join(roles)}\""
-    #     ], check=True)
+    with transaction.atomic():
+        existing_cert = Certificate.objects.filter(
+            user=request.user,
+            revoked=False,
+            valid_until__gt=now,
+        ).first()
+        if existing_cert:
+            return Response(
+                {"error": "You already have a valid certificate. Revoke it or wait for expiration."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-    #     # Step 4: Copy signed cert back to host
-    #     cert_path_host = pub_path + "-cert.pub"
-    #     cert_path_container = container_path + "-cert.pub"
-    #     subprocess.run(["docker", "cp", f"certificate-authority:{cert_path_container}", cert_path_host], check=True)
+        public_key_obj = (
+            PublicKey.objects.select_for_update()
+            .filter(user=request.user, signed=False)
+            .order_by("-uploaded_at")
+            .first()
+        )
+        if not public_key_obj:
+            return Response(
+                {"error": "No unsigned public key found for this user."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-    #     # Step 5: Read signed cert
-    #     with open(cert_path_host) as f:
-    #         signed_cert = f.read()
+        try:
+            parsed_key = validate_ssh_public_key(public_key_obj.key_data)
+        except SSHValidationError as exc:
+            return Response({"error": f"Stored key failed validation: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
 
-    #     # Step 6: Cleanup
-    #     os.remove(pub_path)
-    #     os.remove(cert_path_host)
+        user_groups = list(request.user.custom_groups.all())
+        if not user_groups and request.user.group:
+            user_groups = [request.user.group]
+        if not user_groups:
+            return Response({"error": "No group associated with this user."}, status=status.HTTP_403_FORBIDDEN)
 
-    #     # Step 7: Mark public key signed & save certificate
-    #     public_key_obj.signed = True
-    #     public_key_obj.save()
+        primary_group = request.user.group or user_groups[0]
+        try:
+            principals = [validate_principal(g.name) for g in user_groups]
+        except SSHValidationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-    #     issued_at = timezone.now()
-    #     valid_until = issued_at + timedelta(days=7)
+        serial = int(time.time() * 1000)
+        try:
+            sign_result = request_certificate_signature(
+                public_key=parsed_key.normalized_key,
+                identity=request.user.email,
+                principals=principals,
+                validity=validity,
+                serial=serial,
+            )
+        except CASigningError as exc:
+            logger.error("CA signing failed for user %s: %s", request.user.email, exc)
+            return Response({"error": "Certificate signing failed."}, status=status.HTTP_502_BAD_GATEWAY)
 
-    #     Certificate.objects.create(
-    #         user=request.user,
-    #         public_key=public_key_obj,
-    #         group=group,
-    #         issued_at=issued_at,
-    #         valid_until=valid_until,
-    #         cert_data=signed_cert
-    #     )
+        issued_at = timezone.now()
+        valid_until = sign_result.get("valid_until_dt") or (issued_at + validity_delta)
+        cert_serial = sign_result.get("serial") or serial
+        signed_cert = sign_result["certificate"]
 
-    #     return HttpResponse(signed_cert, content_type="text/plain")
+        public_key_obj.signed = True
+        public_key_obj.save(update_fields=["signed"])
 
-    # except PublicKey.DoesNotExist:
-    #     return Response({'error': 'No unsigned public key found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+        cert = Certificate.objects.create(
+            user=request.user,
+            public_key=public_key_obj,
+            group=primary_group,
+            serial=cert_serial,
+            principals=",".join(principals),
+            valid_until=valid_until,
+            cert_data=signed_cert,
+        )
+        log_activity(
+            request.user,
+            "certificate_issued",
+            {
+                "cert_id": str(cert.id),
+                "serial": cert_serial,
+                "principals": principals,
+                "valid_until": valid_until.isoformat(),
+                "fingerprint": parsed_key.fingerprint_sha256,
+            },
+        )
 
-    # except subprocess.CalledProcessError as e:
-    #     return Response({'error': 'Signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-@csrf_exempt  
+    return HttpResponse(signed_cert, content_type="text/plain")
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_user(request):
     user = request.user
-
-    return JsonResponse({
-        "email": user.email or "N/A",
-        "full_name": f"{user.username}" or "N/A",
-        "group": user.group.name if user.group else "N/A",
-        "role": user.group.name,  # Add this field to model if needed
-        "date_joined": user.date_joined.strftime("%Y-%m-%d %H:%M:%S")
-    })
-
-""""
-def sign_key_on_remote_ca(request):
-    try:
-         # Check if user already has a valid (non-expired) certificate
-        existing_cert = Certificate.objects.filter(
-            user=request.user,
-            valid_until__gt=timezone.now()
-        ).first()
-
-        if existing_cert:
-            return Response({
-                'error': 'You already have a valid certificate. You can request a new one after it expires.'
-            }, status=status.HTTP_403_FORBIDDEN)
-        REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "54.159.193.62"
-        REMOTE_CONTAINER = "certificate-authority"
-        SSH_KEY_PATH = os.path.expanduser("~/Downloads/formradul.pem")
-
-        public_key_obj = PublicKey.objects.filter(user=request.user, signed=False).latest('uploaded_at')
-        public_key = public_key_obj.key_data
-
-        user_groups = request.user.custom_groups.all()
-        if not user_groups.exists():
-            return Response({'error': 'No group associated with this user'}, status=status.HTTP_403_FORBIDDEN)
-
-        group = user_groups.first()
-        roles = list(user_groups.values_list('name', flat=True))
-        username = request.user.username
-
-        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-            f.write(public_key)
-            pub_path = f.name
-
-        filename = os.path.basename(pub_path)
-        remote_tmp_path = f"/tmp/{filename}"
-        remote_cert_path = f"{remote_tmp_path}-cert.pub"
-        local_cert_path = f"{pub_path}-cert.pub"
-        roles_str = ",".join(roles)
-
-        subprocess.run([
-            "scp", "-i", SSH_KEY_PATH, pub_path,
-            f"{REMOTE_USER}@{REMOTE_HOST}:{remote_tmp_path}"
-        ], check=True)
-
-        remote_command = (
-            f"sudo docker cp {remote_tmp_path} {REMOTE_CONTAINER}:{remote_tmp_path} && "
-            f"sudo docker exec {REMOTE_CONTAINER} bash -c "
-            f"'/usr/local/bin/sign.sh {remote_tmp_path} {username} \"{roles_str}\"' && "
-            f"sudo docker cp {REMOTE_CONTAINER}:{remote_tmp_path}-cert.pub {remote_cert_path}"
-        )
+    group_name = user.group.name if user.group else "N/A"
+    return JsonResponse(
+        {
+            "email": user.email or "N/A",
+            "full_name": user.username or "N/A",
+            "group": group_name,
+            "role": group_name,
+            "is_admin": bool(user.is_admin_user or user.is_superuser),
+            "date_joined": user.date_joined.isoformat(),
+        }
+    )
 
 
-        subprocess.run([
-            "ssh", "-i", SSH_KEY_PATH,
-            f"{REMOTE_USER}@{REMOTE_HOST}",
-            remote_command
-        ], check=True)
-
-        subprocess.run([
-            "scp", "-i", SSH_KEY_PATH,
-            f"{REMOTE_USER}@{REMOTE_HOST}:{remote_cert_path}", local_cert_path
-        ], check=True)
-
-        with open(local_cert_path) as cert_file:
-            signed_cert = cert_file.read()
-
-        os.remove(pub_path)
-        os.remove(local_cert_path)
-
-        public_key_obj.signed = True
-        public_key_obj.save()
-
-        issued_at = timezone.now()
-        valid_until = issued_at + timedelta(days=7)
-
-        Certificate.objects.create(
-            user=request.user,
-            public_key=public_key_obj,
-            group=group,
-            issued_at=issued_at,
-            valid_until=valid_until,
-            cert_data=signed_cert
-        )
-
-        return HttpResponse(signed_cert, content_type="text/plain")
-
-    except PublicKey.DoesNotExist:
-        return Response({'error': 'No unsigned public key found for this user.'}, status=status.HTTP_404_NOT_FOUND)
-
-    except subprocess.CalledProcessError as e:
-        return Response({'error': 'Remote signing process failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-"""
-def sign_key_on_remote_ca(request):
-    try:
-        # Check if user already has a valid (non-expired) certificate
-        existing_cert = Certificate.objects.filter(
-            user=request.user,
-            valid_until__gt=timezone.now()
-        ).first()
-        if existing_cert:
-            return Response({
-                'error': 'You already have a valid certificate. You can request a new one after it expires.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        # Docker container info
-        CONTAINER_NAME = "certificate-authority"
-
-        # Fetch the user's latest unsigned public key
-        public_key_obj = PublicKey.objects.filter(user=request.user, signed=False).latest('uploaded_at')
-        public_key = public_key_obj.key_data
-
-        # Get user's group and roles
-        user_groups = request.user.custom_groups.all()
-        if not user_groups.exists():
-            return Response({'error': 'No group associated with this user'}, status=status.HTTP_403_FORBIDDEN)
-        group = user_groups.first()
-        roles = list(user_groups.values_list('name', flat=True))
-        roles_str = ",".join(roles)
-        username = request.user.username
-
-        # Save public key to a temporary file
-        with tempfile.NamedTemporaryFile(delete=False, mode='w') as f:
-            f.write(public_key)
-            local_pub_path = f.name
-
-        # Define paths inside the container
-        container_pub_path = f"/tmp/{os.path.basename(local_pub_path)}"
-        container_cert_path = f"{container_pub_path}-cert.pub"
-        local_cert_path = f"{local_pub_path}-cert.pub"
-
-        # Step 1: Copy public key into the Docker container
-        subprocess.run([
-            "docker", "cp", local_pub_path, f"{CONTAINER_NAME}:{container_pub_path}"
-        ], check=True)
-
-        # Step 2: Run the signing script inside the container
-        subprocess.run([
-            "docker", "exec", CONTAINER_NAME, "bash", "-c",
-            f"/usr/local/bin/sign.sh {container_pub_path} {username} \"{roles_str}\""
-        ], check=True)
-
-        # Step 3: Copy the signed certificate back to host
-        subprocess.run([
-            "docker", "cp", f"{CONTAINER_NAME}:{container_cert_path}", local_cert_path
-        ], check=True)
-
-        # Step 4: Read signed certificate and clean up temp files
-        with open(local_cert_path) as f:
-            signed_cert = f.read()
-        os.remove(local_pub_path)
-        os.remove(local_cert_path)
-
-        # Step 5: Mark public key as signed
-        public_key_obj.signed = True
-        public_key_obj.save()
-
-        # Step 6: Save certificate metadata in DB
-        issued_at = timezone.now()
-        valid_until = issued_at + timedelta(days=7)
-        Certificate.objects.create(
-            user=request.user,
-            public_key=public_key_obj,
-            group=group,
-            issued_at=issued_at,
-            valid_until=valid_until,
-            cert_data=signed_cert
-        )
-
-        # Return signed certificate to the user
-        return HttpResponse(signed_cert, content_type="text/plain")
-
-    except PublicKey.DoesNotExist:
-        return Response({'error': 'No unsigned public key found for this user.'}, status=status.HTTP_404_NOT_FOUND)
-
-    except subprocess.CalledProcessError as e:
-        return Response({'error': 'Docker container signing failed', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@csrf_exempt
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_all_certs(request):
-    user = request.user
-    certs = Certificate.objects.filter(user=user).order_by("-issued_at")
-    data = []
-    for cert in certs:
-        data.append({
-            "cert": cert.cert_data,  
+    certs = Certificate.objects.filter(user=request.user).select_related("group").order_by("-issued_at")
+    data = [
+        {
+            "id": str(cert.id),
+            "cert": cert.cert_data,
             "issued_at": cert.issued_at.isoformat(),
             "valid_until": cert.valid_until.isoformat(),
-            "group": cert.group.name if cert.group else "N/A"
-        })
+            "group": cert.group.name if cert.group else "N/A",
+            "principals": cert.principals,
+            "serial": cert.serial,
+            "revoked": cert.revoked,
+            "revoked_at": cert.revoked_at.isoformat() if cert.revoked_at else None,
+        }
+        for cert in certs
+    ]
     return JsonResponse({"certificates": data})
 
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def logout_view(request):
-    try:
-        refresh_token = request.data.get("refresh")
-        token = RefreshToken(refresh_token)
-        token.blacklist()
-        return Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
-    except Exception as e:
-        return Response({"error": "Invalid token or already logged out"}, status=status.HTTP_400_BAD_REQUEST)
-    
-def log_activity(user, action, metadata=None):
-    ActivityLog.objects.create(user=user, action=action, metadata=metadata or {})
 
-
-@csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def revoke_cert(request):
-    cert_id = request.data.get("cert_id")
-    cert = Certificate.objects.filter(id=cert_id, user=request.user).first()
+def logout_view(request):
+    refresh_token = request.data.get("refresh") or request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+    if refresh_token:
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception:
+            pass
+
+    log_activity(request.user, "user_logged_out")
+    response = Response({"message": "Logged out successfully"}, status=status.HTTP_200_OK)
+    _clear_auth_cookies(response)
+    return response
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def revoke_cert(request, cert_id=None):
+    target_id = cert_id or request.data.get("cert_id")
+    if not target_id:
+        return Response({"error": "cert_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    cert = Certificate.objects.filter(id=target_id, user=request.user).first()
     if not cert:
-        return Response({"error": "Certificate not found"}, status=404)
-    
+        return Response({"error": "Certificate not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if cert.revoked:
+        return Response({"message": "Certificate is already revoked."}, status=status.HTTP_200_OK)
+
     cert.revoked = True
     cert.revoked_at = timezone.now()
-    cert.save()
-    log_activity(request.user, "revoked certificate", {"cert_id": cert_id})
-    return Response({"message": "Certificate revoked"})
+    cert.save(update_fields=["revoked", "revoked_at"])
+    log_activity(request.user, "certificate_revoked", {"cert_id": str(cert.id), "serial": cert.serial})
+    return Response({"message": "Certificate revoked", "cert_id": str(cert.id)})
 
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def get_groups(request):
-    groups = Group.objects.all().values_list('name', flat=True)
+    if request.method == "POST":
+        if not (request.user.is_admin_user or request.user.is_superuser):
+            return Response(
+                {"error": "Only administrators can create groups."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        name = str(request.data.get("name", "")).strip()
+        server_tags = str(request.data.get("server_tags", name)).strip() or name
+        try:
+            validate_principal(name)
+        except SSHValidationError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        group, created = Group.objects.get_or_create(
+            name=name,
+            defaults={"server_tags": server_tags},
+        )
+        if not created:
+            return Response({"error": f"Group '{name}' already exists."}, status=status.HTTP_409_CONFLICT)
+
+        log_activity(request.user, "group_created", {"group": group.name, "server_tags": group.server_tags})
+        return Response(
+            {"message": "Group created successfully.", "name": group.name, "server_tags": group.server_tags},
+            status=status.HTTP_201_CREATED,
+        )
+
+    groups = Group.objects.all().order_by("name").values_list("name", flat=True)
     return JsonResponse(list(groups), safe=False)
 
-# @api_view(["GET"])
-# @permission_classes([IsAuthenticated])
-# def get_activity_logs(request):
-#     logs = ActivityLog.objects.filter(user=request.user).order_by('-timestamp')[:20]
-#     return JsonResponse({
-#         "logs": [
-#             {"action": log.action, "timestamp": log.timestamp.isoformat(), "metadata": log.metadata}
-#             for log in logs
-#         ]
-#     })
 
-# @api_view(["GET"])
-# @permission_classes([IsAuthenticated])
-# def certs_per_day(request):
-#     from django.db.models.functions import TruncDate
-#     from django.db.models import Count
-
-#     data = (
-#         Certificate.objects
-#         .filter(user=request.user)
-#         .annotate(date=TruncDate('issued_at'))
-#         .values('date')
-#         .annotate(count=Count('id'))
-#         .order_by('date')
-#     )
-
-#     return JsonResponse({"history": list(data)})
-
-# authentication/views.py
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_registration_groups(request):
+    if not settings.ALLOW_SELF_REGISTRATION:
+        return Response({"error": "Self-registration is disabled."}, status=status.HTTP_403_FORBIDDEN)
+    groups = Group.objects.exclude(name="ubuntu").order_by("name").values_list("name", flat=True)
+    return JsonResponse(list(groups), safe=False)
 
 
-# @csrf_exempt
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def get_group_ips(request):
-#     group = request.user.group  # or request.user.custom_group.name if your field differs
-#     ips = GroupIP.objects.filter(group_name=group).values_list('public_ip', flat=True)
-#     return Response({"ips": list(ips)})
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_activity_logs(request):
+    logs = ActivityLog.objects.filter(user=request.user).order_by("-timestamp")[:50]
+    return JsonResponse(
+        {
+            "logs": [
+                {
+                    "event": log.event,
+                    "timestamp": log.timestamp.isoformat(),
+                    "metadata": log.metadata,
+                }
+                for log in logs
+            ]
+        }
+    )
 
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def healthz(request):
+    db_ok = False
+    try:
+        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        db_ok = True
+    except Exception as exc:
+        logger.error("Database healthcheck failed: %s", exc)
+
+    ca_ok = check_ca_signer_health()
+    overall = db_ok and ca_ok
+    return JsonResponse(
+        {
+            "status": "ok" if overall else "degraded",
+            "database": "ok" if db_ok else "error",
+            "ca_signer": "ok" if ca_ok else "error",
+        },
+        status=200 if overall else 503,
+    )
